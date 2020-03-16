@@ -25,7 +25,7 @@ set(voxel_lib
 
 add_executable(VoxelMagick main.cpp ${voxel_lib})
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(VoxelMagick pugixml OpenMP::OpenMP_CXX)
+    target_link_libraries(VoxelMagick stdc++fs pugixml OpenMP::OpenMP_CXX)
 else()
-    target_link_libraries(VoxelMagick pugixml)
+    target_link_libraries(VoxelMagick stdc++fs pugixml)
 endif()

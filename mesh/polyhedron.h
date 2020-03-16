@@ -9,13 +9,15 @@
 #include <tuple>
 #include <map>
 #include <fstream>
+#include <limits>
 
 
 namespace mesh {
     struct vertex {
+        // flooating point vertex position
         glm::vec3 _position;
         glm::vec3 _normal;
-
+        
         vertex(const glm::vec3& p, const glm::vec3& n = glm::vec3(0)) {
             _position = p;
             _normal = n;
@@ -23,7 +25,7 @@ namespace mesh {
 
         // for std::set
         friend bool operator< (const vertex &lhs, const vertex &rhs) {
-            return std::make_tuple(lhs._position.x, lhs._position.y, lhs._position.z) < std::make_tuple(rhs._position.x, rhs._position.y, rhs._position.z);
+            return std::tie(lhs._position.x, lhs._position.y, lhs._position.z) < std::tie(rhs._position.x, rhs._position.y, rhs._position.z);
         }
     };
 
@@ -50,23 +52,29 @@ namespace mesh {
         }
     };
 
+    template <typename T>
     struct vertex_buf {
         /*number of adjescent faces*/
-        std::map<vertex, int> _vertex_map;
+        std::map<T, int> _vertex_map;
         /*direct access*/
-        std::vector<vertex> _vertex_arr;
+        std::vector<T> _vertex_arr;
 
-        void build_buffer();
+        void build_buffer() {
+            _vertex_arr.clear();
+            for(const auto &v : _vertex_map) {
+                _vertex_arr.push_back(v.first);
+            }
+        }
     };
 
     //! Yet another index based mesh
     //! Each vertex is stored exactly once within a hash table
     //! The face indices are stored separately and evaluated for error detection
-    struct polyhedron {
-        vertex_buf _vertices;           // vertices
+    struct polyhedron {       
+        vertex_buf<vertex> _vertices;           // floating point vertex representation        
         index_buffer _indices;          // face indices
         std::map<edge, int> _edges;     // edges with number of adjacent faces
-
+        
         //! in case the mesh is convex, the tests are cheaper :D
         //! x = V - E + F see: https://en.wikipedia.org/wiki/Euler_characteristic
         int euler_characteristic() const;

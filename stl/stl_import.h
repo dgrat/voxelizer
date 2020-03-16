@@ -5,6 +5,8 @@
 #include <limits>
 #include <vector>
 #include <fstream>
+#include <cstdio>
+#include <iostream>
 #include <cassert>
 #include <set>
 #include <map>
@@ -69,6 +71,21 @@ namespace stl {
             static mesh::polyhedron to_polyhedron(const std::vector<face> &);
 
             static void save(const std::vector<face> &, const std::string &filename);
+
+            static std::ofstream open(const std::string &file) {
+                std::remove(file.c_str());
+                std::ofstream f(file, std::ios::out | std::ios::binary | std::ios::app);
+                return f;
+            }
+
+            template<typename T>
+            static void append(std::ofstream &file, const T & data) {
+                file.write((char*)(&data), sizeof(T));
+            }
+
+            static void close(std::ofstream &file) {
+                file.close();
+            }
 
             bool load(const std::string &filename);
             const std::vector<face> &faces() const;

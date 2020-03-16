@@ -8,11 +8,11 @@
 
 int main()
 {
-    cfg::xml_project pro("/home/varg/voxelizer/shapes/");
+    cfg::xml_project pro("shapes/");
     voxelize::voxelizer<shell_rule> v(pro);
     //voxelize::voxelizer<fill_rule> v(pro);
     v.run();
-    v.to_stl("/home/varg/voxels.stl");
+    v.to_stl("voxels.stl");
 
     return 0;
 }

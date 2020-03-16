@@ -72,3 +72,7 @@ Thumbs.db
 *.exe
 
 *.user
+*.kdev*
+
+# directories
+build*

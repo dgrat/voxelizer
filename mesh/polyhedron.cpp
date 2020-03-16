@@ -1,14 +1,8 @@
 #include "polyhedron.h"
+#include <limits>
 
 
-namespace mesh {
-    void vertex_buf::build_buffer() {
-        _vertex_arr.clear();
-        for(const auto &v : _vertex_map) {
-            _vertex_arr.push_back(v.first);
-        }
-    }
-
+namespace mesh {   
     //! in case the mesh is convex, the tests are cheaper :D
     //! x = V - E + F see: https://en.wikipedia.org/wiki/Euler_characteristic
     int polyhedron::euler_characteristic() const {

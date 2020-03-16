@@ -14,18 +14,10 @@
 namespace cfg {
     //! shape settings
     struct shape_settings {
-        std::string _file = "";
-        std::string _priority = "";
-        std::string _material = "";
+        std::string _file;
+        std::string _priority;
+        std::string _material;
         glm::vec3 _voxel_size;
-
-        shape_settings() = default;
-        shape_settings(const std::string &dir, std::string prio, std::string mat, const glm::vec3 &arr) {
-            _file = dir;
-            _priority = prio;
-            _material = mat;
-            _voxel_size = arr;
-        }
 
         // for std::set
         friend bool operator< (const shape_settings &lhs, const shape_settings &rhs) {
