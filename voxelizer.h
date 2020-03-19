@@ -7,6 +7,7 @@
 #include "checks.h"
 #include "xml_config.h"
 #include <filesystem>
+#include <fstream>
 #include "rules.h"
 
 #include <set>
@@ -16,7 +17,15 @@
 
 
 namespace voxelize {
-/*
+
+    struct voxel_arr {
+        glm::ivec3 _arr_dim;
+        glm::vec3 _offset;
+        cfg::shape_settings _setting;
+        std::vector<int8_t> _voxels;
+        size_t _num_voxels;
+    };
+    
     //! generates a voxel mesh from an arbitrary polyhedron
     template<typename rule_t> class grid {
         mesh::polyhedron _polyhedron;
@@ -28,21 +37,19 @@ namespace voxelize {
             _bbox = poly.bounding_box();
         }
 
-        std::vector<voxel_t> hexaeders_in(const cfg::shape_settings &setting) const {
+        voxel_arr hexaeders_in(const cfg::shape_settings &setting) const {
             const glm::vec3 from = glm::floor(_bbox._min - 0.5f);
             const glm::vec3 to = glm::ceil(_bbox._max + 0.5f);
             const glm::ivec3 steps = glm::abs(to - from) / setting._voxel_size;
             const size_t voxels = static_cast<size_t>(steps.x) * steps.y * steps.z;
-            std::vector<voxel_t> buffer(voxels);
+            voxel_arr res = { steps, glm::vec3(0), setting, std::vector<int8_t>(voxels, -1) };
 
             int progress = 0;
 //#pragma omp parallel for
-            for(int x = 0; x < steps.x; x++) {
             for(int y = 0; y < steps.y; y++) {
             for(int z = 0; z < steps.z; z++) {
-                const glm::vec3 pos = from + glm::vec3(x,y,z) * setting._voxel_size;
-                buffer[x * steps.y * steps.z  + y * steps.z + z] = rule_t::evaluate(pos, _polyhedron, setting);
-            }
+                const glm::vec3 pos = from + glm::vec3(0,y,z) * setting._voxel_size;
+                checks::raycast::fill_x(pos, {0,y,z}, setting._voxel_size, _polyhedron, steps, res._voxels);
             }
 
 //#pragma omp critical
@@ -50,18 +57,13 @@ namespace voxelize {
             std::cout << "progress: " << ++progress << "/" << steps.x << std::endl;
 }
             }
-            return buffer;
+
+            return res;
         }
     };
-*/
-    struct voxel_arr {
-        glm::ivec3 _arr_dim;
-        glm::vec3 _offset;
-        cfg::shape_settings _setting;
-        std::vector<bool> _voxels;
-        size_t _num_voxels;
-    };
 
+
+/*
     //! generates a voxel mesh from an arbitrary polyhedron
     template<typename rule_t> class grid {
         mesh::polyhedron _polyhedron;
@@ -79,12 +81,12 @@ namespace voxelize {
             const size_t faces = _polyhedron._indices._buffer.size() / _polyhedron._indices._stride;
 
             const stl::bbox bbox = _polyhedron.bounding_box();
-            const glm::vec3 &gmin = bbox._min / setting._voxel_size - glm::vec3(1);
-            const glm::vec3 &gmax = bbox._max / setting._voxel_size + glm::vec3(1);
-            const glm::ivec3 gsteps = glm::ceil(gmax) - glm::floor(gmin);
+            const glm::vec3 &gmin = glm::floor(bbox._min / setting._voxel_size - glm::vec3(1));
+            const glm::vec3 &gmax = glm::ceil(bbox._max / setting._voxel_size + glm::vec3(1));
+            const glm::ivec3 gsteps = gmax - gmin;
             const size_t gvoxels = static_cast<size_t>(gsteps.x) * gsteps.y * gsteps.z;
 
-            voxel_arr res = { gsteps, gmin*setting._voxel_size, setting, std::vector<bool>(gvoxels) };
+            voxel_arr res = { gsteps, gmin*setting._voxel_size, setting, std::vector<uint8_t>(gvoxels) };
             size_t voxels = 0;
             const auto start = std::chrono::steady_clock::now();
             for(size_t face_id = 0; face_id < faces; face_id++) {
@@ -99,9 +101,9 @@ namespace voxelize {
                     v[vid3]._position / setting._voxel_size
                 };
 
-                const glm::vec3 lmin = glm::min(face[2], glm::min(face[0], face[1])) - glm::vec3(0.5);
-                const glm::vec3 lmax = glm::max(face[2], glm::max(face[0], face[1])) + glm::vec3(0.5);
-                const glm::ivec3 lsteps = glm::ceil(lmax) - glm::floor(lmin);
+                const glm::vec3 lmin = glm::floor(glm::min(face[2], glm::min(face[0], face[1])));
+                const glm::vec3 lmax = glm::ceil(glm::max(face[2], glm::max(face[0], face[1])) + glm::vec3(0.5));
+                const glm::ivec3 lsteps = lmax - lmin;
 
                 face[0] -= lmin;
                 face[1] -= lmin;
@@ -116,7 +118,7 @@ namespace voxelize {
                     const size_t id = i.x * gsteps.y * gsteps.z + i.y * gsteps.z + i.z;
                     
                     if(res._voxels[id]) continue;
-                    if(checks::nonconvex::raycast::face_in_hexahedron(face, {x,y,z}, glm::vec3(0.5))) {
+                    if(checks::intersection_3d::face_in_hexahedron(face, {x,y,z}, glm::vec3(0.5))) {
                         res._voxels[id] = true;
                         res._num_voxels++;
                     }
@@ -129,7 +131,7 @@ namespace voxelize {
             return res;
         }
     };
-
+*/
     template<typename rule_t>
     class voxelizer {
         cfg::xml_project _project_cfg;
@@ -161,6 +163,41 @@ namespace voxelize {
                     }
                 }
                 stl::format::close(stlf);
+            }
+        }
+        
+        void to_vox(const std::string &out_file) {
+            struct v3uint8_t {
+                uint8_t x = 0;
+                uint8_t y = 0;
+                uint8_t z = 0;
+            };
+            
+            // saves a voxel file (.slab.vox format, can be imported by MagicaVoxel)
+            std::vector<v3uint8_t> palette(256); // RGB palette
+            palette[123] = { 127, 0, 127 };
+            palette[124] = { 255, 0, 0 };
+            palette[125] = { 0, 255, 0 };
+            palette[126] = { 0, 0, 255 };
+            palette[127] = { 255, 255, 255 };
+            
+            for(const voxel_arr &arr : _rasterizer_res) {
+                std::ofstream f(out_file, std::ios::out | std::ios::binary);
+                const auto &vox_size = arr._arr_dim;
+                f.write((const char*)&vox_size, sizeof(glm::ivec3));
+                
+                for(int x = 0; x < vox_size.x; x++)
+                for(int y = 0; y < vox_size.y; y++)
+                for(int z = 0; z < vox_size.z; z++) {
+                    const size_t i = x * vox_size.y * vox_size.z  + y * vox_size.z + z;
+                    uint8_t v = arr._voxels[i];
+                    uint8_t pal = v == 1 ? 127 : 255;
+                    f.write((const char*)&pal, 1);
+                }
+
+                f.write((const char*)&palette[0], palette.size()*sizeof(v3uint8_t));
+                f.close();
+                break;
             }
         }
 

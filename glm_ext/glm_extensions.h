@@ -2,6 +2,7 @@
 
 //#define GLM_FORCE_SSE2 
 //#define GLM_FORCE_AVX
+#define GLM_FORCE_SWIZZLE 
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <glm/glm.hpp>
@@ -12,6 +13,7 @@
 #include <glm/gtx/projection.hpp>
 #include <glm/gtx/vector_angle.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/component_wise.hpp>
 
 #include <tuple>
 
