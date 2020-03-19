@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../glm/glm_extensions.h"
+#include "../glm_ext/glm_extensions.h"
 
 #include "../stl/stl_import.h"
 

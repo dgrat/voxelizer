@@ -1,6 +1,6 @@
 #pragma once
 
-#include "glm/glm_extensions.h"
+#include "glm_ext/glm_extensions.h"
 
 #include "mesh/polyhedron.h"
 #include "stl/stl_import.h"
@@ -79,8 +79,8 @@ namespace voxelize {
             const size_t faces = _polyhedron._indices._buffer.size() / _polyhedron._indices._stride;
 
             const stl::bbox bbox = _polyhedron.bounding_box();
-            const glm::vec3 &gmin = bbox._min / setting._voxel_size;
-            const glm::vec3 &gmax = bbox._max / setting._voxel_size;
+            const glm::vec3 &gmin = bbox._min / setting._voxel_size - glm::vec3(1);
+            const glm::vec3 &gmax = bbox._max / setting._voxel_size + glm::vec3(1);
             const glm::ivec3 gsteps = glm::ceil(gmax) - glm::floor(gmin);
             const size_t gvoxels = static_cast<size_t>(gsteps.x) * gsteps.y * gsteps.z;
 
@@ -99,8 +99,8 @@ namespace voxelize {
                     v[vid3]._position / setting._voxel_size
                 };
 
-                const glm::vec3 lmin = glm::min(face[2], glm::min(face[0], face[1]));
-                const glm::vec3 lmax = glm::max(face[2], glm::max(face[0], face[1]));
+                const glm::vec3 lmin = glm::min(face[2], glm::min(face[0], face[1])) - glm::vec3(0.5);
+                const glm::vec3 lmax = glm::max(face[2], glm::max(face[0], face[1])) + glm::vec3(0.5);
                 const glm::ivec3 lsteps = glm::ceil(lmax) - glm::floor(lmin);
 
                 face[0] -= lmin;
@@ -112,9 +112,12 @@ namespace voxelize {
                 for(int x = 0; x < lsteps.x; x++)
                 for(int y = 0; y < lsteps.y; y++)
                 for(int z = 0; z < lsteps.z; z++) {
+                    const glm::ivec3 i = glm::ivec3(x,y,z) + offs;
+                    const size_t id = i.x * gsteps.y * gsteps.z + i.y * gsteps.z + i.z;
+                    
+                    if(res._voxels[id]) continue;
                     if(checks::nonconvex::raycast::face_in_hexahedron(face, {x,y,z}, glm::vec3(0.5))) {
-                        const glm::ivec3 i = glm::ivec3(x,y,z) + offs;
-                        res._voxels[i.x * gsteps.y * gsteps.z + i.y * gsteps.z + i.z] = true;
+                        res._voxels[id] = true;
                         res._num_voxels++;
                     }
                 }
@@ -151,8 +154,9 @@ namespace voxelize {
                 for(int z = 0; z < arr._arr_dim.z; z++) {
                     const size_t i = x * vox_size.y * vox_size.z  + y * vox_size.z + z;
                     if(!arr._voxels[i]) continue;
+                    
                     const glm::vec3 pos = glm::vec3(x,y,z) * arr._setting._voxel_size + arr._offset;
-                    for(auto &f : rule_t::mesh(pos, arr._setting)) {
+                    for(stl::face &f : rule_t::mesh(pos, arr._setting)) {
                         stl::format::append(stlf, f);
                     }
                 }
@@ -169,7 +173,7 @@ namespace voxelize {
             for(const auto &shape : _project_cfg.shapes()) {
                 stl::format stl;
                 const std::filesystem::path file = path / shape._file;
-                stl.load(file);
+                stl.load(file.string());
 
                 auto polyhedron = stl.to_polyhedron(stl.faces());
                 grid<rule_t> grid_voxelizer(polyhedron);

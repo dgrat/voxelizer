@@ -1,8 +1,8 @@
 #pragma once
 
-#include "glm/glm_extensions.h"
+#include "glm_ext/glm_extensions.h"
 
-#include "pugixml.hpp"
+#include <pugixml.hpp>
 #include <string>
 #include <iostream>
 #include <filesystem>
@@ -61,14 +61,14 @@ namespace cfg {
             return _project_file;
         }
         const std::string project_path() const {
-            return std::filesystem::path(_project_file).parent_path();
+            return std::filesystem::path(_project_file).parent_path().string();
         }
 
         void init(const std::string &project_dir) {
             std::vector<std::string> xml_files;
             for (const auto& entry : std::filesystem::directory_iterator(project_dir)) {
-                if(endsWithIgnoreCase(entry.path(), ".xml")) {
-                    xml_files.push_back(entry.path());
+                if(endsWithIgnoreCase(entry.path().string(), ".xml")) {
+                    xml_files.push_back(entry.path().string());
                 }
             }
             if(xml_files.size() == 1) {

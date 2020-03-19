@@ -1,5 +1,7 @@
 #pragma once
 
+//#define GLM_FORCE_SSE2 
+//#define GLM_FORCE_AVX
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <glm/glm.hpp>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../glm/glm_extensions.h"
+#include "../glm_ext/glm_extensions.h"
 
 #include <limits>
 #include <vector>
@@ -79,12 +79,12 @@ namespace stl {
             }
 
             template<typename T>
-            static void append(std::ofstream &file, const T & data) {
-                file.write((char*)(&data), sizeof(T));
+            static void append(std::ofstream &f, const T & data) {
+                f.write((char*)(&data), sizeof(T));
             }
 
-            static void close(std::ofstream &file) {
-                file.close();
+            static void close(std::ofstream &f) {
+                f.close();
             }
 
             bool load(const std::string &filename);
