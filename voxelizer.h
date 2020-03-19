@@ -116,7 +116,7 @@ namespace voxelize {
                     const size_t id = i.x * gsteps.y * gsteps.z + i.y * gsteps.z + i.z;
                     
                     if(res._voxels[id]) continue;
-                    if(checks::nonconvex::raycast::face_in_hexahedron(face, {x,y,z}, glm::vec3(0.5))) {
+                    if(checks::intersection_3d::face_in_hexahedron(face, {x,y,z}, glm::vec3(0.5))) {
                         res._voxels[id] = true;
                         res._num_voxels++;
                     }

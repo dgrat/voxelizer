@@ -22,7 +22,7 @@ struct voxel_t {
 struct shell_rule {
     static voxel_t evaluate(const glm::vec3 &pos, const mesh::polyhedron &poly, const cfg::shape_settings &setting) {
         bool in = false;
-        if(checks::nonconvex::raycast::is_shell(pos, poly, setting)) {
+        if(checks::intersection_3d::is_shell(pos, poly, setting)) {
             in = true;
         }
         return { pos, in };
@@ -69,7 +69,7 @@ struct shell_rule {
 struct fill_rule {
     static voxel_t evaluate(const glm::vec3 &pos, const mesh::polyhedron &poly, const cfg::shape_settings &) {
         bool in = false;
-        if(checks::nonconvex::raycast::is_in(pos, poly)) {
+        if(checks::raycast::is_in(pos, poly)) {
             in = true;
         }
         return { pos, in };
