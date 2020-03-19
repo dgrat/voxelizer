@@ -72,7 +72,84 @@ namespace voxelize {
             _polyhedron = poly;
             _bbox = poly.bounding_box();
         }
+        
+        voxel_arr hexaeders_in(const cfg::shape_settings &setting) const {
+            const auto &v =  _polyhedron._vertices._vertex_arr;
+            const auto &index_buf = _polyhedron._indices._buffer;
+            const size_t faces = _polyhedron._indices._buffer.size() / _polyhedron._indices._stride;
 
+            const stl::bbox bbox = _polyhedron.bounding_box();
+            const glm::vec3 &gmin = bbox._min / setting._voxel_size - glm::vec3(1);
+            const glm::vec3 &gmax = bbox._max / setting._voxel_size + glm::vec3(1);
+            const glm::ivec3 gsteps = glm::ceil(gmax) - glm::floor(gmin);
+            const size_t gvoxels = static_cast<size_t>(gsteps.x) * gsteps.y * gsteps.z;
+
+            voxel_arr res = { gsteps, gmin*setting._voxel_size, setting, std::vector<bool>(gvoxels) };
+            size_t voxels = 0;
+            const auto start = std::chrono::steady_clock::now();
+            for(size_t face_id = 0; face_id < faces; face_id++) {
+                const glm::ivec3 id = glm::ivec3(face_id) * _polyhedron._indices._stride;
+                const uint32_t vid1 = index_buf.at(id.x+0);
+                const uint32_t vid2 = index_buf.at(id.y+1);
+                const uint32_t vid3 = index_buf.at(id.z+2);
+
+                std::array<glm::vec3, 3> face = {
+                    v[vid1]._position / setting._voxel_size,
+                    v[vid2]._position / setting._voxel_size,
+                    v[vid3]._position / setting._voxel_size
+                };
+                
+                glm::vec3 e1 = glm::normalize(face[1] - face[0]);
+                glm::vec3 e2 = glm::normalize(face[2] - face[0]);
+                glm::vec3 face_normal = glm::cross(e1, e2);
+                
+                float angle_x = glm::angle(face_normal, glm::vec3(1,0,0));
+                float angle_y = glm::angle(face_normal, glm::vec3(0,1,0));
+                float angle_z = glm::angle(face_normal, glm::vec3(0,0,1));
+
+                glm::vec3 axis_x = glm::cross(face_normal, glm::vec3(1,0,0));
+                glm::vec3 axis_y = glm::cross(face_normal, glm::vec3(0,1,0));
+                glm::vec3 axis_z = glm::cross(face_normal, glm::vec3(0,0,1));
+                
+                glm::vec3 f1 = glm::rotate(face[0], -angle_x, axis_x);
+                glm::vec3 f2 = glm::rotate(face[1], -angle_x, axis_x);
+                glm::vec3 f3 = glm::rotate(face[2], -angle_x, axis_x);
+                
+                printf("x %f y %f z %f \n", glm::degrees(angle_x), glm::degrees(angle_x), glm::degrees(angle_x));
+                printf("face1 x %f y %f z %f \n", f1.x, f1.y, f1.z);
+                printf("face2 x %f y %f z %f \n", f2.x, f2.y, f2.z);
+                printf("face3 x %f y %f z %f \n", f3.x, f3.y, f3.z);
+                
+                const glm::vec3 lmin = glm::min(face[2], glm::min(face[0], face[1])) - glm::vec3(0.5);
+                const glm::vec3 lmax = glm::max(face[2], glm::max(face[0], face[1])) + glm::vec3(0.5);
+                const glm::ivec3 lsteps = glm::ceil(lmax) - glm::floor(lmin);
+
+                face[0] -= lmin;
+                face[1] -= lmin;
+                face[2] -= lmin;
+
+                const glm::ivec3 offs = lmin - gmin;
+
+                for(int x = 0; x < lsteps.x; x++)
+                for(int y = 0; y < lsteps.y; y++)
+                for(int z = 0; z < lsteps.z; z++) {
+                    const glm::ivec3 i = glm::ivec3(x,y,z) + offs;
+                    const size_t id = i.x * gsteps.y * gsteps.z + i.y * gsteps.z + i.z;
+                    
+                    if(res._voxels[id]) continue;
+                    if(checks::intersection_3d::face_in_hexahedron(face, {x,y,z}, glm::vec3(0.5))) {
+                        res._voxels[id] = true;
+                        res._num_voxels++;
+                    }
+                }
+            }
+
+            const auto end = std::chrono::steady_clock::now();
+            std::cout << "time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << std::endl;
+            std::cout << "created " << (float)res._num_voxels/1000000 << " M voxels" << std::endl;
+            return res;
+        }
+/*
         voxel_arr hexaeders_in(const cfg::shape_settings &setting) const {
             const auto &v =  _polyhedron._vertices._vertex_arr;
             const auto &index_buf = _polyhedron._indices._buffer;
@@ -128,6 +205,7 @@ namespace voxelize {
             std::cout << "created " << (float)res._num_voxels/1000000 << " M voxels" << std::endl;
             return res;
         }
+*/
     };
 
     template<typename rule_t>
