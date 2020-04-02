@@ -25,7 +25,7 @@ namespace checks {
         }
         
         // check whether and where a ray crosses an edge from a face
-        bool edge_collision(const glm::vec3 &pos, const glm::vec3 ray_direction, const mesh::polyhedron &poly) {
+        bool edge_collision(const glm::vec3 &pos, const glm::vec3 ray_direction, const mesh::polyhedron_flt &poly) {
             // 1) Calculate angle between the ray and an arbitrary vector used for a projection of the later points
             const glm::vec3 ref = glm::vec3(0,0,1);
             const glm::vec3 axis = glm::cross(ref, ray_direction);
@@ -34,8 +34,8 @@ namespace checks {
 
             // 2) go over all edges
             for(const auto &e : poly._edges) {
-                const glm::vec3 &e1 = poly._vertices._vertex_arr.at(e.first._id1)._position;
-                const glm::vec3 &e2 = poly._vertices._vertex_arr.at(e.first._id2)._position;
+                const glm::vec3 &e1 = poly._vertices._vertex_arr.at(e.first._id1);
+                const glm::vec3 &e2 = poly._vertices._vertex_arr.at(e.first._id2);
 
                 // 3) rotate all points
                 const glm::vec2 rot_e1 = rotation * e1;
@@ -51,7 +51,7 @@ namespace checks {
             return false;
         }
 
-        std::set<float> ray_intersections_safe(const glm::vec3 &pos, const glm::vec3 &dir, const mesh::polyhedron &poly) {
+        std::set<float> ray_intersections_safe(const glm::vec3 &pos, const glm::vec3 &dir, const mesh::polyhedron_flt &poly) {
             const auto &vertex_arr =  poly._vertices._vertex_arr;
             const auto &index_buf = poly._indices._buffer;
             const size_t faces = poly._indices._buffer.size() / poly._indices._stride;
@@ -69,9 +69,9 @@ namespace checks {
                 bool is_inters = glm::intersectRayTriangle(
                     pos,
                     dir,
-                    vertex_arr.at(vid1)._position,
-                    vertex_arr.at(vid2)._position,
-                    vertex_arr.at(vid3)._position,
+                    vertex_arr.at(vid1),
+                    vertex_arr.at(vid2),
+                    vertex_arr.at(vid3),
                     bary_pos,
                     distance
                 );
@@ -120,7 +120,7 @@ namespace checks {
             z_dir
         };
 
-        std::set<float> ray_intersections_fast(const glm::vec3 &pos, const mesh::polyhedron &poly, const direction dir) {
+        std::set<float> ray_intersections_fast(const glm::vec3 &pos, const mesh::polyhedron_flt &poly, const direction dir) {
             const auto &vertex_arr =  poly._vertices._vertex_arr;
             const auto &index_buf = poly._indices._buffer;
             const size_t faces = poly._indices._buffer.size() / poly._indices._stride;
@@ -133,9 +133,9 @@ namespace checks {
                 const size_t vid2 = index_buf.at(id.y);
                 const size_t vid3 = index_buf.at(id.z);
 
-                const glm::vec3 &v1 = vertex_arr.at(vid1)._position;
-                const glm::vec3 &v2 = vertex_arr.at(vid2)._position;
-                const glm::vec3 &v3 = vertex_arr.at(vid3)._position;
+                const glm::vec3 &v1 = vertex_arr.at(vid1);
+                const glm::vec3 &v2 = vertex_arr.at(vid2);
+                const glm::vec3 &v3 = vertex_arr.at(vid3);
 
                 glm::vec2 bary_pos(0);
                 float distance = 0;
@@ -166,7 +166,7 @@ namespace checks {
              const glm::vec3 &pos,
              const glm::ivec3 &voxel_pos,
              const glm::vec3 &voxel_size,
-             const mesh::polyhedron &poly,
+             const mesh::polyhedron_flt &poly,
              const glm::ivec3 &dim,
              std::vector<int8_t> &buffer
             )
@@ -380,7 +380,7 @@ namespace checks {
 
         // for voxel shell calculation we invert the test
         // we do not check wheter a voxel is in the mesh, but whether a face is in the bbox of the voxel
-        bool is_shell(const glm::vec3 &pos, const mesh::polyhedron &poly, const cfg::shape_settings &settings) {
+        bool is_shell(const glm::vec3 &pos, const mesh::polyhedron_flt &poly, const cfg::shape_settings &settings) {
             const auto &vertex_arr =  poly._vertices._vertex_arr;
             const auto &index_buf = poly._indices._buffer;
             const size_t faces = poly._indices._buffer.size() / poly._indices._stride;
@@ -395,9 +395,9 @@ namespace checks {
 
                 // face vertices
                 const std::array<glm::vec3, 3> face = {
-                    vertex_arr.at(vid1)._position,
-                    vertex_arr.at(vid2)._position,
-                    vertex_arr.at(vid3)._position
+                    vertex_arr.at(vid1),
+                    vertex_arr.at(vid2),
+                    vertex_arr.at(vid3)
                 };
                 if(face_in_hexahedron(face, pos, half_box_size)) return true;
             }

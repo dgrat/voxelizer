@@ -28,11 +28,11 @@ namespace voxelize {
     
     //! generates a voxel mesh from an arbitrary polyhedron
     template<typename rule_t> class grid {
-        mesh::polyhedron _polyhedron;
+        mesh::polyhedron_flt _polyhedron;
         stl::bbox _bbox;                // bounding box of the mesh
 
     public:
-        grid(const mesh::polyhedron &poly) {
+        grid(const mesh::polyhedron_flt &poly) {
             _polyhedron = poly;
             _bbox = poly.bounding_box();
         }

@@ -108,10 +108,9 @@ namespace stl {
         return _faces;
     }
 
-    mesh::polyhedron format::to_polyhedron(const std::vector<face> &faces) {
-        mesh::polyhedron mesh;
+    mesh::polyhedron_flt format::to_polyhedron(const std::vector<face> &faces) {
+        mesh::polyhedron_flt mesh;
         auto &vertex_map =  mesh._vertices._vertex_map;
-        auto &vertex_arr =  mesh._vertices._vertex_arr;
 
         // put vertices into a hash table
         for(const auto &f : faces) {
@@ -135,11 +134,6 @@ namespace stl {
             mesh._edges[mesh::edge(id_v1, id_v2)] += 1;
             mesh._edges[mesh::edge(id_v2, id_v3)] += 1;
             mesh._edges[mesh::edge(id_v3, id_v1)] += 1;
-
-            // calculate vertex normals
-            vertex_arr.at(id_v1)._normal = glm::normalize(vertex_arr.at(id_v1)._normal + f._norm);
-            vertex_arr.at(id_v2)._normal = glm::normalize(vertex_arr.at(id_v2)._normal + f._norm);
-            vertex_arr.at(id_v3)._normal = glm::normalize(vertex_arr.at(id_v3)._normal + f._norm);
         }
         return mesh;
     }

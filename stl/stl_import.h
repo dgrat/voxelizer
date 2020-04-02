@@ -11,10 +11,11 @@
 #include <set>
 #include <map>
 
-
 namespace mesh {
+    template<class T>
     struct polyhedron;
-};
+    using polyhedron_flt = polyhedron<float>;
+}
 
 namespace stl {
     #pragma pack(push, 1)
@@ -68,7 +69,7 @@ namespace stl {
             format() = default;
             format(const std::string &file);
 
-            static mesh::polyhedron to_polyhedron(const std::vector<face> &);
+            static mesh::polyhedron_flt to_polyhedron(const std::vector<face> &faces);
 
             static void save(const std::vector<face> &, const std::string &filename);
 
