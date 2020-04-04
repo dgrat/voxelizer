@@ -19,10 +19,14 @@ include_directories(
 set(voxel_lib
     glm_ext/glm_extensions.h
     mesh/polyhedron.h
-    mesh/polyhedron.cpp
+    mesh/polyhedron.tpp
     stl/stl_import.h
     stl/stl_import.cpp
     voxelizer.h
+    enums.h
+    rasterizer.h
+    buffer.h
+    timer.h
     rules.h
     checks.h
     checks.cpp

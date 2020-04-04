@@ -8,8 +8,9 @@
 
 namespace stl {
     //! Estimates global factor to scale the whole model to 0 < x < 1
-    float bbox::scale() const {
-        float max(-FLT_MAX);
+    template<typename base_t>
+    base_t bbox<base_t>::scale() const {
+        base_t max(-FLT_MAX);
         glm::vec3 dif = _max - _min;
 
         for(int i = 0; i < 3; i++) {
@@ -19,11 +20,12 @@ namespace stl {
     }
 
     //! Estimates offset to scale the whole model to 0 <= x <= 1
-    glm::vec3 bbox::offset() const {
+    template<typename base_t>
+    glm::vec<3, base_t> bbox<base_t>::offset() const {
         return _min * (-1.f);
     }
 
-    std::vector<face> format::normalized(const bbox &b, const std::vector<face> &faces, const glm::vec3 &transl) {
+    std::vector<face> format::normalized(const bbox<float> &b, const std::vector<face> &faces, const glm::vec3 &transl) {
         const float scale = b.scale();
         const glm::vec3 offs = b.offset();
 
@@ -38,7 +40,7 @@ namespace stl {
         return res;
     }
 
-    std::vector<face> format::remove_offset(const bbox &b, const std::vector<face> &faces) {
+    std::vector<face> format::remove_offset(const bbox<float> &b, const std::vector<face> &faces) {
         const glm::vec3 offs = b.offset();
         const glm::vec3 dim = (b._max - b._min) / 2.f;
 
@@ -53,7 +55,7 @@ namespace stl {
         return res;
     }
 
-    bbox format::estimate_bbox(const std::vector<face> &faces) {
+    bbox<float> format::estimate_bbox(const std::vector<face> &faces) {
         glm::vec3 min(FLT_MAX);
         glm::vec3 max(-FLT_MAX);
 
@@ -75,6 +77,16 @@ namespace stl {
         }
     }
 
+    void format::close(std::ofstream &f) {
+        f.close();
+    }
+    
+    std::ofstream format::open(const std::string &file) {
+        std::remove(file.c_str());
+        std::ofstream f(file, std::ios::out | std::ios::binary | std::ios::app);
+        return f;
+    }
+    
     bool format::load(const std::string &filename) {
         std::ifstream ifs;
         ifs.open (filename.c_str(), std::ios::in | std::ios::binary);
@@ -108,25 +120,21 @@ namespace stl {
         return _faces;
     }
 
-    mesh::polyhedron_flt format::to_polyhedron(const std::vector<face> &faces) {
-        mesh::polyhedron_flt mesh;
-        auto &vertex_map =  mesh._vertices._vertex_map;
+    mesh::polyhedron<float> format::to_polyhedron(const std::vector<face> &faces) {
+        mesh::polyhedron<float> mesh;
+        auto &vertex_arr =  mesh._vertices;
 
         // put vertices into a hash table
+        int i = 0;
         for(const auto &f : faces) {
-            vertex_map[f._vert_1] += 1;
-            vertex_map[f._vert_2] += 1;
-            vertex_map[f._vert_3] += 1;
-        }
-        // building the array type buffe, holding the vertices
-        mesh._vertices.build_buffer();
+            vertex_arr.push_back(f._vert_1);
+            vertex_arr.push_back(f._vert_2);
+            vertex_arr.push_back(f._vert_3);
 
-        // build index list
-        for(const auto &f : faces) {
-            auto id_v1 = std::distance(vertex_map.begin(), vertex_map.find(f._vert_1));
-            auto id_v2 = std::distance(vertex_map.begin(), vertex_map.find(f._vert_2));
-            auto id_v3 = std::distance(vertex_map.begin(), vertex_map.find(f._vert_3));
-
+            int id_v1 = i*3+0;
+            int id_v2 = i*3+1;
+            int id_v3 = i*3+2;
+            
             mesh._indices.add(id_v1);
             mesh._indices.add(id_v2);
             mesh._indices.add(id_v3);
@@ -134,6 +142,8 @@ namespace stl {
             mesh._edges[mesh::edge(id_v1, id_v2)] += 1;
             mesh._edges[mesh::edge(id_v2, id_v3)] += 1;
             mesh._edges[mesh::edge(id_v3, id_v1)] += 1;
+            
+            i++;
         }
         return mesh;
     }
