@@ -17,7 +17,6 @@ namespace cfg {
         std::string _file;
         std::string _priority;
         std::string _material;
-        glm::vec3 _voxel_size;
 
         // for std::set
         friend bool operator< (const shape_settings &lhs, const shape_settings &rhs) {
@@ -29,6 +28,7 @@ namespace cfg {
     class xml_project {
         std::string _project_file = "";
         std::set<shape_settings> _shapes;
+        glm::ivec3 _max_grid_size;
 
         static bool endsWithIgnoreCase(const std::string& str, const std::string& suffix) {
             return std::regex_search(str, std::regex(std::string(suffix) + "$", std::regex_constants::icase));
@@ -42,18 +42,21 @@ namespace cfg {
                     const std::string file = tool.attribute("file").as_string();
                     const std::string prio = tool.attribute("priority").as_string();
                     const std::string mat = tool.attribute("material").as_string();
-
-                    auto s = tool.child("size");
-                    float x = s.attribute("x").as_float();
-                    float y = s.attribute("y").as_float();
-                    float z = s.attribute("z").as_float();
-                    _shapes.insert({ file, prio, mat, {x,y,z} });
+                    _shapes.insert({file, prio, mat});
                 }
+                pugi::xml_node g = doc.child("project").child("grid");
+                float x = g.attribute("max_x").as_int();
+                float y = g.attribute("max_y").as_int();
+                float z = g.attribute("max_z").as_int();
+                _max_grid_size = {x,y,z};
             }
             return result;
         }
 
     public:
+        const glm::ivec3 &max_grid_size() const {
+            return _max_grid_size;
+        }
         const std::set<shape_settings> &shapes() const {
             return _shapes;
         }

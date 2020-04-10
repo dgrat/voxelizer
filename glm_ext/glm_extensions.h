@@ -23,3 +23,17 @@ struct compare_glm_vec3 {
         return std::make_tuple(lhs.x, lhs.y, lhs.z) < std::make_tuple(rhs.x, rhs.y, rhs.z);
     }
 };
+
+template <typename base_t>
+base_t constrain(const base_t &min, const base_t &max, const base_t &val) {
+    return val < min ? min : val > max ? max : val;
+}
+
+template <typename base_t>
+glm::vec<3, base_t> constrain(const glm::vec<3, base_t> &min, const glm::vec<3, base_t> &max, glm::vec<3, base_t> &val) {
+    return {
+        constrict(min.x, max.x, val.x),
+        constrict(min.y, max.y, val.y),
+        constrict(min.z, max.z, val.z)
+    };
+}

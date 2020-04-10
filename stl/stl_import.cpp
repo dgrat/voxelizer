@@ -16,13 +16,13 @@ namespace stl {
         for(int i = 0; i < 3; i++) {
             max = dif[i] > max ? dif[i] : max;
         }
-        return 1.f / max;
+        return base_t(1) / max;
     }
 
     //! Estimates offset to scale the whole model to 0 <= x <= 1
     template<typename base_t>
     glm::vec<3, base_t> bbox<base_t>::offset() const {
-        return _min * (-1.f);
+        return _min * base_t(-1);
     }
 
     std::vector<face> format::normalized(const bbox<float> &b, const std::vector<face> &faces, const glm::vec3 &transl) {
@@ -73,7 +73,7 @@ namespace stl {
 
     format::format(const std::string &file) {
         if(!load(file)) {
-            //qDebug() << "Failed loading file";
+            std::cerr << file << ": could not be loaded" << std::endl; 
         }
     }
 

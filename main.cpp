@@ -9,10 +9,10 @@
 int main()
 {
     cfg::xml_project pro("shapes/");
-    voxelize::voxelizer<build_stl_cube> v(pro);
+    voxelize::voxelizer v(pro);
     v.run();
     v.to_vox("voxels.vox");
-    v.to_stl("voxels.stl");
+    v.to_stl<build_stl_cube>(".");
     
     return 0;
 }

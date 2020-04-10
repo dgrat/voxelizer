@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #set ( CMAKE_CXX_FLAGS "-msse -mavx")
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
 
 include_directories(
     glm
@@ -31,6 +35,7 @@ set(voxel_lib
     checks.h
     checks.cpp
     xml_config.h
+    vox_file.h
 )
 
 find_package(Git QUIET)

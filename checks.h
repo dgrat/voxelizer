@@ -382,11 +382,11 @@ namespace checks {
         // for voxel shell calculation we invert the test
         // we do not check wheter a voxel is in the mesh, but whether a face is in the bbox of the voxel
         template<typename base_t>
-        bool is_shell(const glm::vec3 &pos, const mesh::polyhedron<base_t> &poly, const cfg::shape_settings &settings) {
+        bool is_shell(const glm::vec3 &pos, const mesh::polyhedron<base_t> &poly, const glm::vec3 &voxel_size) {
             const auto &vertex_arr =  poly._vertices._vertex_arr;
             const auto &index_buf = poly._indices._buffer;
             const size_t faces = poly._indices._buffer.size() / poly._indices._stride;
-            const glm::vec3 half_box_size = settings._voxel_size / 2.f;
+            const glm::vec3 half_box_size = voxel_size / 2.f;
 
             for(size_t face_id = 0; face_id < faces; face_id++) {
                 // walk over faces

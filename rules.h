@@ -20,7 +20,7 @@ struct voxel_t {
 };
 
 struct build_stl_cube {
-    static std::vector<stl::face> mesh(const glm::vec3 &pos, const cfg::shape_settings &setting) {
+    static std::vector<stl::face> mesh(const glm::vec3 &pos, const glm::vec3 cube_size) {
         auto get_corners = [=](const glm::vec3 &size) {
             std::array<glm::vec3, 8> arr = {
                 glm::vec3(pos.x - size.x/2, pos.y - size.y/2, pos.z - size.z/2),
@@ -35,7 +35,7 @@ struct build_stl_cube {
             return arr;
         };
 
-        auto c = get_corners(setting._voxel_size);
+        auto c = get_corners(cube_size);
         return {
             { glm::vec3(0), c[1], c[0], c[3] },
             { glm::vec3(0), c[3], c[2], c[1] },

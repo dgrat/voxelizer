@@ -13,27 +13,26 @@
 #include <vector>
 
 namespace rasterize {
+    template<typename base_t>
     struct voxel_arr {
         glm::ivec3 _arr_dim;
-        glm::vec3 _offset;
-        cfg::shape_settings _setting;
         buffer3d<int8_t> _voxels;
+        mesh::polyhedron<base_t> _mesh; // rescaled
         size_t _num_voxels;
     };
 
     template<typename base_t>
     class raster_base {        
     public:        
-        virtual voxel_arr rasterize() const = 0;
+        virtual voxel_arr<base_t> rasterize() const = 0;
     };
     
     //! generates a voxel mesh from an arbitrary polyhedron
     template<typename base_t>
     class all_fast : public raster_base<base_t> {
-        using id_t = mesh::polyhedron<base_t>::index_t;
+        using id_t = typename mesh::polyhedron<base_t>::index_t;
         
         mesh::polyhedron<base_t> _polyhedron;
-        cfg::shape_settings _cfg;
         
         buffer3d<id_t> _xy_plane_buffer;
         buffer3d<id_t> _yz_plane_buffer;
@@ -111,34 +110,15 @@ namespace rasterize {
         }
         
     public: 
-        all_fast(const mesh::polyhedron<base_t> &poly, const cfg::shape_settings &cfg) {
-            _cfg = cfg;
-            _polyhedron = prepare_index_buffers(poly, cfg._voxel_size, _xy_plane_buffer, _yz_plane_buffer, _xz_plane_buffer);
+        all_fast(const mesh::polyhedron<base_t> &poly, glm::ivec3 dim) {
+            _polyhedron = prepare_index_buffers(poly, dim, _xy_plane_buffer, _yz_plane_buffer, _xz_plane_buffer);
         }
         
-        virtual voxel_arr rasterize() const {
+        virtual voxel_arr<base_t> rasterize() const {
             const glm::ivec3 dim = glm::ceil(_polyhedron.dim());
-            voxel_arr res = { dim, glm::vec3(0), _cfg, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0) };
+            voxel_arr<base_t> res = { dim, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0), _polyhedron };
         
             benchmark::timer tmp("rasterize()");
-            
-            for(int x = 0; x < dim.x; x++)
-            for(int y = 0; y < dim.y; y++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xyz>({x,y}, _polyhedron._vertices, _xy_plane_buffer);
-                bool is_in = intersections.size() % 2 == 0 ? false : true;
-                
-                int from = 0;
-                for(int inters : intersections) {
-                    res._voxels[x][y][inters] = voxel_type::shell;
-                    for(int i = from; i < inters; i++) {
-                        inters = inters < dim.z ? inters : dim.z-1;
-                        if(res._voxels[x][y][i] == voxel_type::shell) continue;
-                        res._voxels[x][y][i] = is_in; // initially set voxel to 1
-                    }
-                    from = inters+1;
-                    is_in = !is_in;
-                }
-            }
 
             for(int y = 0; y < dim.y; y++)
             for(int z = 0; z < dim.z; z++) {
@@ -147,11 +127,13 @@ namespace rasterize {
                 
                 int from = 0;
                 for(int inters : intersections) {
-                    res._voxels[inters][y][z] = voxel_type::shell;
+                    inters = constrain(0, dim.x-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[inters][y][z] = voxel_type::shell;                    
                     for(int i = from; i < inters; i++) {
                         inters = inters < dim.x ? inters : dim.x-1;
                         if(res._voxels[i][y][z] == voxel_type::shell) continue;
-                        res._voxels[i][y][z] <<= is_in; // first bit shift
+                        res._voxels[i][y][z] = is_in; // initially set voxel to 1
                     }
                     from = inters+1;
                     is_in = !is_in;
@@ -165,17 +147,39 @@ namespace rasterize {
                 
                 int from = 0;
                 for(int inters : intersections) {
+                    inters = constrain(0, dim.y-1, inters); // ensure we do not exceed array boundaries
+                    
                     res._voxels[x][inters][z] = voxel_type::shell;
                     for(int i = from; i < inters; i++) {
                         inters = inters < dim.y ? inters : dim.y-1;
                         if(res._voxels[x][i][z] == voxel_type::shell) continue;
-                        res._voxels[x][i][z] <<= is_in; // second bit shift; now the value should be either 0 or voxel_type::interior
+                        res._voxels[x][i][z] <<= is_in; // first bit shift; now the value should be either 0 or voxel_type::interior
                     }
                     from = inters+1;
                     is_in = !is_in;
                 }
             }
 
+            for(int x = 0; x < dim.x; x++)
+            for(int y = 0; y < dim.y; y++) {
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>({x,y}, _polyhedron._vertices, _xy_plane_buffer);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, dim.z-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[x][y][inters] = voxel_type::shell;
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.z ? inters : dim.z-1;
+                        if(res._voxels[x][y][i] == voxel_type::shell) continue;
+                        res._voxels[x][y][i] <<= is_in; // second bit shift; now the value should be either 0 or voxel_type::interior
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+            
             return res;
         }
     };
@@ -184,21 +188,19 @@ namespace rasterize {
     template<typename base_t>
     class shell_only : public raster_base<base_t> {
         mesh::polyhedron<base_t> _polyhedron;
-        cfg::shape_settings _cfg;
         
     public:
-        shell_only(const mesh::polyhedron<base_t> &poly, const cfg::shape_settings &cfg) {
-            _cfg = cfg;
+        shell_only(const mesh::polyhedron<base_t> &poly, const glm::ivec3 &dim) {
             _polyhedron = poly;
             _polyhedron.normalize();
-            _polyhedron.scale(cfg._voxel_size);
+            _polyhedron.scale(dim);
         }
         
-        voxel_arr rasterize() const {
+        voxel_arr<base_t> rasterize() const {
             benchmark::timer tmp("rasterize()");
             
             const glm::ivec3 dim = glm::ceil(_polyhedron.dim());
-            voxel_arr res = { dim, glm::vec3(0), _cfg, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0) };
+            voxel_arr res = { dim, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0), _polyhedron };
             
             const size_t stride = _polyhedron._indices._stride;
             const auto &index_buf = _polyhedron._indices._buffer;
