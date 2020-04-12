@@ -35,6 +35,8 @@ namespace voxelize {
         std::vector<voxel_data_t> _rasterizer_res;
         
         stl::bbox<float> _prj_bbox;
+        float _max_grid_size = 0;
+        float _voxel_size = 0;
         
     private:
         //! calculates the project bbox
@@ -64,6 +66,19 @@ namespace voxelize {
     public:
         voxelizer(const cfg::xml_project &cfg) {
             _project_cfg = cfg;
+            
+            // calc the meshes and the project bbox
+            project_bbox();
+            
+            if(_project_cfg.grid_size_defined()) {
+                _max_grid_size = _project_cfg.max_grid_size();
+                _voxel_size = _project_cfg.voxel_size();
+            }
+            else if(_project_cfg.voxel_size_defined()) {
+                _voxel_size = _project_cfg.voxel_size();
+                const float max_bbox_edge = glm::compMax(_prj_bbox._max - _prj_bbox._min);
+                _max_grid_size = glm::ceil(max_bbox_edge / _voxel_size);
+            }
         }
         
         template<typename rule_t>
@@ -89,15 +104,18 @@ namespace voxelize {
                 stl::format::append(stlf, faces);
                 
                 const glm::vec3 proj_dim = (_prj_bbox._max - _prj_bbox._min);
-                const float scalef = _project_cfg.max_grid_size().x / glm::compMax(proj_dim);                
-                const glm::vec3 offset = glm::round((mdata.bbox._min - _prj_bbox._min) * scalef);
+                const float scalef = _max_grid_size / glm::compMax(proj_dim);                
+                glm::vec3 offset = glm::round((mdata.bbox._min - _prj_bbox._min) * scalef) * _voxel_size;
+                if(_project_cfg.voxel_size_defined()) {
+                    offset = glm::round(mdata.bbox._min * scalef) * _voxel_size;
+                }
                 
                 // now write faces of hull cubes into stl
                 for(int x = 0; x < arr._arr_dim.x; x++)
                 for(int y = 0; y < arr._arr_dim.y; y++)
                 for(int z = 0; z < arr._arr_dim.z; z++) {
                     if(arr._voxels[x][y][z] != voxel_type::shell) continue;
-                    for(stl::face &f : rule_t::mesh(glm::vec3(x,y,z)+offset, glm::vec3(1))) {
+                    for(stl::face &f : rule_t::mesh(glm::vec3(x,y,z)*_voxel_size+offset, glm::vec3(_voxel_size))) {
                         stl::format::append(stlf, f);
                     }
                 }
@@ -147,11 +165,13 @@ namespace voxelize {
         }
 
         void run() {
-            // calc the meshes and the project bbox
-            project_bbox();
+            if(!_project_cfg.voxel_size_defined() && !_project_cfg.grid_size_defined()) {
+                std::cerr << "Neither maximum grid size, nor voxel size defined in *.xml file" << std::endl;
+                return;
+            }
+            
             const glm::vec3 proj_dim = (_prj_bbox._max - _prj_bbox._min);
-            const float scalef = _project_cfg.max_grid_size().x / glm::compMax(proj_dim);
-            printf ("scalef %f proj_dim %f %f %f\n", scalef, proj_dim.x, proj_dim.y, proj_dim.z);
+            const float scalef = _max_grid_size / glm::compMax(proj_dim);
             
             for(voxel_data_t &mdata : _rasterizer_res) {
                 // calculate uniorm scale factor (+/- 1 voxel)
@@ -160,7 +180,7 @@ namespace voxelize {
                 const float dim = glm::round(glm::compMax(mesh_dim));
                 
                 mdata.voxels = rasterize::all_fast(mdata.mesh, glm::ivec3(dim)).rasterize();
-                //mdata.voxels = rasterize::shell_only(mdata.mesh, _project_cfg.max_grid_size()).rasterize();
+                //mdata.voxels = rasterize::shell_only(mdata.mesh, _max_grid_size).rasterize();
             }
         }
     };

@@ -1,5 +1,14 @@
 <project>
-    <grid max_x="128" max_y="128" max_z="128"></grid>
+    <grid 
+        max_voxels="128"
+        stl_voxel_size="0.5"
+    >
+    </grid>
+    
+    <voxel_size 
+        edge_length="1"
+    >
+    </voxel_size>
     
     <stl 
         file="torus.stl"

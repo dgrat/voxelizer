@@ -26,10 +26,14 @@ namespace cfg {
 
     //! project settings
     class xml_project {
-        std::string _project_file = "";
-        std::set<shape_settings> _shapes;
-        glm::ivec3 _max_grid_size;
-
+        std::string                 _project_file = "";
+        std::set<shape_settings>    _shapes;
+        int                         _grid_size; // maximum number of voxels (either along: w, h, d)
+        float                       _voxel_size; // alternatively use voxel size
+        bool                        _voxel_size_defined = false;
+        bool                        _grid_size_defined = false;
+        
+        
         static bool endsWithIgnoreCase(const std::string& str, const std::string& suffix) {
             return std::regex_search(str, std::regex(std::string(suffix) + "$", std::regex_constants::icase));
         }
@@ -45,17 +49,35 @@ namespace cfg {
                     _shapes.insert({file, prio, mat});
                 }
                 pugi::xml_node g = doc.child("project").child("grid");
-                float x = g.attribute("max_x").as_int();
-                float y = g.attribute("max_y").as_int();
-                float z = g.attribute("max_z").as_int();
-                _max_grid_size = {x,y,z};
+                if(!g.empty()) {
+                    _grid_size_defined = true;
+                    const int s = g.attribute("max_voxels").as_int();
+                    const float e = g.attribute("stl_voxel_size").as_float();
+                    _grid_size = s;
+                    _voxel_size = e;
+                }
+                pugi::xml_node r = doc.child("project").child("voxel_size");
+                if(!r.empty()) {
+                    _voxel_size_defined = true;
+                    const float e = r.attribute("edge_length").as_float();
+                    _voxel_size = e;
+                }
             }
             return result;
         }
 
     public:
-        const glm::ivec3 &max_grid_size() const {
-            return _max_grid_size;
+        const bool voxel_size_defined() const {
+            return _voxel_size_defined;
+        }
+        const bool grid_size_defined() const {
+            return _grid_size_defined;
+        }
+        const float voxel_size() const {
+            return _voxel_size;
+        }
+        const int max_grid_size() const {
+            return _grid_size;
         }
         const std::set<shape_settings> &shapes() const {
             return _shapes;
