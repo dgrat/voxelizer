@@ -153,21 +153,21 @@ namespace checks {
             return is_in;
         }        
         
-        template<swizzle_mode mode, typename base_t>
+        template<swizzle_mode mode, typename base_t, typename index_t>
         std::set<int> get_intersections(const glm::vec<2, base_t> &pos, 
                                         const std::vector<glm::vec<3, base_t>> &vert_buffer, 
-                                        const buffer3d<size_t> &face_indices, 
+                                        const buffer3d<index_t> &face_indices, 
                                         const int stride = 3) 
         {
             const auto &vertex_arr =  vert_buffer;
             const auto &index_buf = face_indices[pos.x][pos.y];
-            const size_t faces = index_buf.size() / stride;
+            const index_t faces = index_buf.size() / stride;
 
             std::set<int> inters_dist;
-            for(size_t face_id = 0; face_id < faces; face_id++) {
-                const size_t vid1 = index_buf[face_id*stride+0];
-                const size_t vid2 = index_buf[face_id*stride+1];
-                const size_t vid3 = index_buf[face_id*stride+2];
+            for(index_t face_id = 0; face_id < faces; face_id++) {
+                const index_t vid1 = index_buf[face_id*stride+0];
+                const index_t vid2 = index_buf[face_id*stride+1];
+                const index_t vid3 = index_buf[face_id*stride+2];
 
                 const glm::vec<3, base_t> &v1 = hidden::swizzle_vector(vertex_arr.at(vid1), mode);
                 const glm::vec<3, base_t> &v2 = hidden::swizzle_vector(vertex_arr.at(vid2), mode);

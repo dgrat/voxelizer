@@ -53,8 +53,8 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     endif()
 endif()
 
-#add_subdirectory(pugixml)
-#link_directories(pugixml)
+add_subdirectory(pugixml)
+link_directories(pugixml)
 
 add_executable(VoxelMagick main.cpp ${voxel_lib})
 if(OpenMP_CXX_FOUND)

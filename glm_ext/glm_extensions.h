@@ -32,8 +32,8 @@ base_t constrain(const base_t &min, const base_t &max, const base_t &val) {
 template <typename base_t>
 glm::vec<3, base_t> constrain(const glm::vec<3, base_t> &min, const glm::vec<3, base_t> &max, glm::vec<3, base_t> &val) {
     return {
-        constrict(min.x, max.x, val.x),
-        constrict(min.y, max.y, val.y),
-        constrict(min.z, max.z, val.z)
+        constrain(min.x, max.x, val.x),
+        constrain(min.y, max.y, val.y),
+        constrain(min.z, max.z, val.z)
     };
 }

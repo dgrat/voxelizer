@@ -56,7 +56,7 @@ namespace mesh {
         glm::vec<3, base_t> _dim;
         
     public:
-        using index_t = size_t;
+        using index_t = uint32_t;
         using vec_t = glm::vec<3, base_t>;
         using arr_t = std::vector<vec_t>;
         

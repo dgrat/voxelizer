@@ -62,6 +62,7 @@ namespace rasterize {
             
             // run over target voxel coordinates 
             // and check whether a faces cuts a posiion in one of the planes
+            size_t num_elems = 0;
             for(int i = 0; i < num_faces; i++) {
                 const id_t id1 = indices._buffer[i * indices._stride + 0];
                 const id_t id2 = indices._buffer[i * indices._stride + 1];
@@ -70,42 +71,47 @@ namespace rasterize {
                 const auto &v1 = mesh._vertices[id1];
                 const auto &v2 = mesh._vertices[id2];
                 const auto &v3 = mesh._vertices[id3];
-            
-                // calc bbox around the face
-                glm::ivec3 min = glm::floor(glm::min(glm::min(v1, v2), v3));
-                glm::ivec3 max = glm::ceil(glm::max(glm::max(v1, v2), v3));
 
-                // build a raw buffer for eache major plane..
+                // TODO
+                // remove faces which are too small
+                
+                // calc bbox around the face
+                // we use the bbox to create a simple search buffer (for later rasterization)
+                const glm::ivec3 min = glm::floor(glm::min(glm::min(v1, v2), v3));
+                const glm::ivec3 max = glm::ceil(glm::max(glm::max(v1, v2), v3));
+
+                // using the bbox: 
+                // insert the face indices into the buffers
+                // do this for each major plane..
                 // xy
-                {
-                    //printf("xy min %d %d %d max %d %d %d\n", min.x, min.y, min.z, max.x, max.y, max.z);
-                    for(int x = min.x; x < max.x; x++)
-                    for(int y = min.y; y < max.y; y++) {
-                        out_xy[x][y].push_back(id1);
-                        out_xy[x][y].push_back(id2);
-                        out_xy[x][y].push_back(id3);
-                    }
+                for(int x = min.x; x < max.x; x++)
+                for(int y = min.y; y < max.y; y++) {
+                    out_xy[x][y].push_back(id1);
+                    out_xy[x][y].push_back(id2);
+                    out_xy[x][y].push_back(id3);
+                    num_elems += 3;
                 }
                 // yz
-                {
-                    for(int y = min.y; y < max.y; y++)
-                    for(int z = min.z; z < max.z; z++) {
-                        out_yz[y][z].push_back(id1);
-                        out_yz[y][z].push_back(id2);
-                        out_yz[y][z].push_back(id3);
-                    }
+                for(int y = min.y; y < max.y; y++)
+                for(int z = min.z; z < max.z; z++) {
+                    out_yz[y][z].push_back(id1);
+                    out_yz[y][z].push_back(id2);
+                    out_yz[y][z].push_back(id3);
+                    num_elems += 3;
                 }
                 // xz
-                {
-                    //printf("xz min %d %d %d max %d %d %d\n", min.x, min.y, min.z, max.x, max.y, max.z);
-                    for(int x = min.x; x < max.x; x++)
-                    for(int z = min.z; z < max.z; z++) {                 
-                        out_xz[x][z].push_back(id1);
-                        out_xz[x][z].push_back(id2);
-                        out_xz[x][z].push_back(id3);
-                    }
+                for(int x = min.x; x < max.x; x++)
+                for(int z = min.z; z < max.z; z++) {                 
+                    out_xz[x][z].push_back(id1);
+                    out_xz[x][z].push_back(id2);
+                    out_xz[x][z].push_back(id3);
+                    num_elems += 3;
                 }
             }
+            
+            float s_mb = (float)(num_elems * sizeof(id_t)) / (1024^2);
+            std::cout << "search buffers are " << (size_t)s_mb << " MBytes" << std::endl;
+            
             return mesh;
         }
         
@@ -118,8 +124,10 @@ namespace rasterize {
             const glm::ivec3 dim = glm::ceil(_polyhedron.dim());
             voxel_arr<base_t> res = { dim, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0), _polyhedron };
         
+            // create timer object
             benchmark::timer tmp("rasterize()");
-
+            
+#pragma omp parallel for
             for(int y = 0; y < dim.y; y++)
             for(int z = 0; z < dim.z; z++) {
                 std::set<int> intersections = checks::raycast::get_intersections<yzx>({y,z}, _polyhedron._vertices, _yz_plane_buffer);
@@ -139,7 +147,7 @@ namespace rasterize {
                     is_in = !is_in;
                 }
             }
-
+#pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int z = 0; z < dim.z; z++) {
                 std::set<int> intersections = checks::raycast::get_intersections<xzy>({x,z}, _polyhedron._vertices, _xz_plane_buffer);
@@ -159,7 +167,7 @@ namespace rasterize {
                     is_in = !is_in;
                 }
             }
-
+#pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int y = 0; y < dim.y; y++) {
                 std::set<int> intersections = checks::raycast::get_intersections<xyz>({x,y}, _polyhedron._vertices, _xy_plane_buffer);

@@ -14,3 +14,8 @@ enum swizzle_mode {
     zxy,
     zyx
 };
+
+enum array_order {
+    row_major = 0,
+    column_major
+};

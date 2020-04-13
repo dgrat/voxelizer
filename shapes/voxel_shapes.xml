@@ -1,31 +1,43 @@
 <project>
     <grid 
         max_voxels="128"
-        stl_voxel_size="0.5"
+        stl_cube_size="0.5"
     >
     </grid>
     
     <voxel_size 
-        edge_length="1"
+        cube_size="1"
     >
     </voxel_size>
     
+    <target
+        dir_out="."
+        raw_fname="foo.raw"
+    >
+    </target>
+    
     <stl 
-        file="torus.stl"
-        priority="0"
-        material="1"
+        file_in="torus.stl"
+        file_out="torus_cubed.stl"
+        merge_priority="0"
+        material_inside="1"
+        material_shell="1"
     >
     </stl>
     <stl 
-        file="cube.stl"
-        priority="1"
-        material="2"
+        file_in="cube.stl"
+        file_out="cube_cubed.stl"
+        merge_priority="0"
+        material_inside="2"
+        material_shell="2"
     >
     </stl>
     <stl 
-        file="cylinder.stl"
-        priority="2"
-        material="3"
+        file_in="cylinder.stl"
+        file_out="cylinder_cubed.stl"
+        merge_priority="0"
+        material_inside="3"
+        material_shell="3"
     >
     </stl>
 </project>
