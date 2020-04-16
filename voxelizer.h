@@ -30,7 +30,10 @@ namespace voxelize {
             mesh::polyhedron<float> mesh;
             cfg::shape_settings cfg;
             stl::bbox<float> bbox;
-            rasterize::voxel_arr<float> voxels;
+            
+            // rasterizer results
+            rasterize::voxel_arr<float> voxels;         // high memory usage
+            rasterize::intersections intersections;     // intersections only
         };
         std::vector<voxel_data_t> _rasterizer_res;
         
@@ -279,7 +282,8 @@ namespace voxelize {
                 
                 std::cout << "Process file: " << mdata.cfg._file_in << std::endl;
                 
-                mdata.voxels = rasterize::all_fast(mdata.mesh, glm::ivec3(dim)).rasterize();
+                //mdata.voxels = rasterize::all_fast(mdata.mesh, glm::ivec3(dim)).rasterize();
+                mdata.intersections = rasterize::all_oct(mdata.mesh, glm::ivec3(dim)).rasterize();
                 //mdata.voxels = rasterize::shell_only(mdata.mesh, _max_grid_size).rasterize();
             }
         }

@@ -167,10 +167,6 @@ namespace checks {
                 const glm::vec<3, base_t> &v2 = hidden::swizzle_vector(vertex_arr.at(f[1]), mode);
                 const glm::vec<3, base_t> &v3 = hidden::swizzle_vector(vertex_arr.at(f[2]), mode);
 
-                glm::vec<3, base_t> e1 = v1 - v2;
-                glm::vec<3, base_t> e2 = v2 - v3;
-                glm::vec<3, base_t> e3 = v3 - v1;
-
                 int d = 0;
                 if(pt_in_triangle(pos, v1, v2, v3, d)) {
                     inters_dist.insert(d);

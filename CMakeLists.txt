@@ -26,6 +26,7 @@ set(voxel_lib
     mesh/polyhedron.tpp
     stl/stl_import.h
     stl/stl_import.cpp
+    octree/tree.h
     voxelizer.h
     enums.h
     rasterizer.h
