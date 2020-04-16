@@ -102,9 +102,7 @@ namespace mesh {
     //! Each vertex is stored exactly once within a hash table
     //! The face indices are stored separately and evaluated for error detection
     template<typename base_t>
-    class polyhedron {   
-        glm::vec<3, base_t> _dim;
-        
+    class polyhedron {        
     public:
         using index_t = uint32_t;
         using vec_t = glm::vec<3, base_t>;
@@ -135,8 +133,8 @@ namespace mesh {
         //! (with vertex normals)
         void to_obj(const std::string &file) const;
         //! estimates the boundingbox (slow)
-        stl::bbox<base_t> bounding_box();
-        const glm::vec<3, base_t>& dim() const { return _dim; }
+        stl::bbox<base_t> bounding_box() const;
+        glm::vec<3, base_t> dim() const;
     }; 
 };
 

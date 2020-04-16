@@ -7,6 +7,7 @@
 #include "xml_config.h"
 #include "buffer.h"
 #include "timer.h"
+#include "tree/tree.h"
 #include "enums.h"
 
 #include <set>
@@ -21,12 +22,6 @@ namespace rasterize {
         size_t _num_voxels;
     };
 
-    template<typename base_t>
-    class raster_base {        
-    public:        
-        virtual voxel_arr<base_t> rasterize() const = 0;
-    };
-    
     template<typename vec_t>
     float area(const vec_t &v1, const vec_t &v2, const vec_t &v3) {
         float le1 = glm::length(v2-v1);
@@ -37,97 +32,95 @@ namespace rasterize {
         return area;
     }
     
-    //! generates a voxel mesh from an arbitrary polyhedron
     template<typename base_t>
-    class all_fast : public raster_base<base_t> {
+    mesh::polyhedron<base_t> prepare_index_buffers(
+        const mesh::polyhedron<base_t> &in_mesh, 
+        const glm::ivec3 &in_scale,
+        buffer3d<mesh::face<id_t>> &out_xy, 
+        buffer3d<mesh::face<id_t>> &out_yz,
+        buffer3d<mesh::face<id_t>> &out_xz
+    ) 
+    {           
+        benchmark::timer tmp("prepare_index_buffers()");
+            
+        mesh::polyhedron<base_t> mesh;
+        mesh = mesh::polyhedron<base_t>::normalized(in_mesh);
+        mesh = mesh::polyhedron<base_t>::scaled(mesh, in_scale);
+        const glm::ivec3 dim = glm::ceil(mesh.dim());
+
+        auto &indices = mesh._indices;
+        out_xy = buffer3d<mesh::face<id_t>>(dim.x, dim.y, 0);
+        out_yz = buffer3d<mesh::face<id_t>>(dim.y, dim.z, 0);
+        out_xz = buffer3d<mesh::face<id_t>>(dim.x, dim.z, 0);
+        
+        // run over target voxel coordinates 
+        // and check whether a faces cuts a posiion in one of the planes
+        size_t num_elems = 0;
+        for(const mesh::face<id_t> &f : indices._buffer) {
+            const auto &v1 = mesh._vertices[f[0]];
+            const auto &v2 = mesh._vertices[f[1]];
+            const auto &v3 = mesh._vertices[f[2]];
+
+            constexpr float area_bias = 0.1;
+            const float a_xz = area(v1.xz(), v2.xz(), v3.xz());
+            const float a_xy = area(v1.xy(), v2.xy(), v3.xy());
+            const float a_yz = area(v1.yz(), v2.yz(), v3.yz());
+            
+            // calc bbox around the face
+            // we use the bbox to create a simple search buffer (for later rasterization)
+            const glm::ivec3 min = glm::floor(glm::min(glm::min(v1, v2), v3));
+            const glm::ivec3 max = glm::ceil(glm::max(glm::max(v1, v2), v3));
+
+            // using the bbox: 
+            // insert the face indices into the buffers
+            // do this for each major plane..
+            // xy
+            if(a_xy > area_bias) {
+                for(int x = min.x; x < max.x; x++)
+                for(int y = min.y; y < max.y; y++) {
+                    out_xy[x][y].push_back(f);
+                    num_elems += 3;
+                }
+            }
+            // yz
+            if(a_yz > area_bias) {
+                for(int y = min.y; y < max.y; y++)
+                for(int z = min.z; z < max.z; z++) {
+                    out_yz[y][z].push_back(f);
+                    num_elems += 3;
+                }
+            }
+            // xz
+            if(a_xz > area_bias) {
+                for(int x = min.x; x < max.x; x++)
+                for(int z = min.z; z < max.z; z++) {                 
+                    out_xz[x][z].push_back(f);
+                    num_elems += 3;
+                }
+            }
+        }
+        float s_mb = (float)((num_elems * sizeof(id_t)) / std::pow(1024, 2));
+        std::cout << "search buffers are " << (size_t)s_mb << " MBytes" << std::endl;
+        return mesh;
+    }
+    
+    //! generates a voxel mesh from an arbitrary polyhedron
+    //! is very fast but memory consumption does not scale well
+    template<typename base_t>
+    class all_fast {
         using id_t = typename mesh::polyhedron<base_t>::index_t;
         
         mesh::polyhedron<base_t> _polyhedron;
-        
         buffer3d<mesh::face<id_t>> _xy_plane_buffer;
         buffer3d<mesh::face<id_t>> _yz_plane_buffer;
         buffer3d<mesh::face<id_t>> _xz_plane_buffer;
-        
-    private:
-        mesh::polyhedron<base_t> prepare_index_buffers(
-            const mesh::polyhedron<base_t> &in_mesh, 
-            const glm::ivec3 &in_scale,
-            buffer3d<mesh::face<id_t>> &out_xy, 
-            buffer3d<mesh::face<id_t>> &out_yz,
-            buffer3d<mesh::face<id_t>> &out_xz
-        ) 
-        {           
-            benchmark::timer tmp("prepare_index_buffers()");
-                
-            mesh::polyhedron<base_t> mesh;
-            mesh = mesh::polyhedron<base_t>::normalized(in_mesh);
-            mesh = mesh::polyhedron<base_t>::scaled(mesh, in_scale);
-            const glm::ivec3 dim = glm::ceil(mesh.dim());
-
-            auto &indices = mesh._indices;
-            out_xy = buffer3d<mesh::face<id_t>>(dim.x, dim.y, 0);
-            out_yz = buffer3d<mesh::face<id_t>>(dim.y, dim.z, 0);
-            out_xz = buffer3d<mesh::face<id_t>>(dim.x, dim.z, 0);
-            
-            // run over target voxel coordinates 
-            // and check whether a faces cuts a posiion in one of the planes
-            size_t num_elems = 0;
-            for(const mesh::face<id_t> &f : indices._buffer) {
-                const auto &v1 = mesh._vertices[f[0]];
-                const auto &v2 = mesh._vertices[f[1]];
-                const auto &v3 = mesh._vertices[f[2]];
-
-                constexpr float area_bias = 0.1;
-                const float a_xz = area(v1.xz(), v2.xz(), v3.xz());
-                const float a_xy = area(v1.xy(), v2.xy(), v3.xy());
-                const float a_yz = area(v1.yz(), v2.yz(), v3.yz());
-                
-                // calc bbox around the face
-                // we use the bbox to create a simple search buffer (for later rasterization)
-                const glm::ivec3 min = glm::floor(glm::min(glm::min(v1, v2), v3));
-                const glm::ivec3 max = glm::ceil(glm::max(glm::max(v1, v2), v3));
-
-                // using the bbox: 
-                // insert the face indices into the buffers
-                // do this for each major plane..
-                // xy
-                if(a_xy > area_bias) {
-                    for(int x = min.x; x < max.x; x++)
-                    for(int y = min.y; y < max.y; y++) {
-                        out_xy[x][y].push_back(f);
-                        num_elems += 3;
-                    }
-                }
-                // yz
-                if(a_yz > area_bias) {
-                    for(int y = min.y; y < max.y; y++)
-                    for(int z = min.z; z < max.z; z++) {
-                        out_yz[y][z].push_back(f);
-                        num_elems += 3;
-                    }
-                }
-                // xz
-                if(a_xz > area_bias) {
-                    for(int x = min.x; x < max.x; x++)
-                    for(int z = min.z; z < max.z; z++) {                 
-                        out_xz[x][z].push_back(f);
-                        num_elems += 3;
-                    }
-                }
-            }
-            
-            float s_mb = (float)((num_elems * sizeof(id_t)) / std::pow(1024, 2));
-            std::cout << "search buffers are " << (size_t)s_mb << " MBytes" << std::endl;
-            
-            return mesh;
-        }
         
     public: 
         all_fast(const mesh::polyhedron<base_t> &poly, glm::ivec3 dim) {
             _polyhedron = prepare_index_buffers(poly, dim, _xy_plane_buffer, _yz_plane_buffer, _xz_plane_buffer);
         }
         
-        virtual voxel_arr<base_t> rasterize() const {
+        voxel_arr<base_t> rasterize() const {
             const glm::ivec3 dim = glm::ceil(_polyhedron.dim());
             voxel_arr<base_t> res = { dim, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0), _polyhedron };
         
@@ -137,7 +130,7 @@ namespace rasterize {
 #pragma omp parallel for
             for(int y = 0; y < dim.y; y++)
             for(int z = 0; z < dim.z; z++) {
-                std::set<int> intersections = checks::raycast::get_intersections<yzx>({y,z}, _polyhedron._vertices, _yz_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<yzx>(glm::vec2(y,z), _polyhedron._vertices, _yz_plane_buffer[y][z]);
                 bool is_in = intersections.size() % 2 == 0 ? false : true;
                 
                 int from = 0;
@@ -157,7 +150,7 @@ namespace rasterize {
 #pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int z = 0; z < dim.z; z++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xzy>({x,z}, _polyhedron._vertices, _xz_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<xzy>(glm::vec2(x,z), _polyhedron._vertices, _xz_plane_buffer[x][z]);
                 bool is_in = intersections.size() % 2 == 0 ? false : true;
                 
                 int from = 0;
@@ -177,7 +170,7 @@ namespace rasterize {
 #pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int y = 0; y < dim.y; y++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xyz>({x,y}, _polyhedron._vertices, _xy_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>(glm::vec2(x,y), _polyhedron._vertices, _xy_plane_buffer[x][y]);
                 bool is_in = intersections.size() % 2 == 0 ? false : true;
                 
                 int from = 0;
@@ -198,10 +191,209 @@ namespace rasterize {
             return res;
         }
     };
+    
+    //! buffer for the intersections
+    //! used by rasterize::all_rle 
+    //! for memory optimization
+    struct intersections {
+        //! xy plane
+        buffer3d<int> xy;
+        //! yz plane
+        buffer3d<int> yz;
+        //! xz plane
+        buffer3d<int> xz;
+    };
+    
+    //! generates a voxel mesh from an arbitrary polyhedron
+    //! uses fast run length encoding to minimize the size
+    template<typename base_t>
+    class all_oct {
+        using id_t = typename mesh::polyhedron<base_t>::index_t;
+        using payload_t = point<glm::vec<2, base_t>, mesh::face<id_t>>;
+        
+        mesh::polyhedron<base_t> _polyhedron;
+        tree<quad::boundary, payload_t> _xy_tree;
+        tree<quad::boundary, payload_t> _yz_tree;
+        tree<quad::boundary, payload_t> _xz_tree;
+        
+        // scale factors for quad trees
+        glm::vec<3, base_t> _tree_scale_factors = glm::vec<3, base_t>(1);
+        float _tree_scale_factor = 1;
+        
+    public: 
+        all_oct(const mesh::polyhedron<base_t> &poly, glm::ivec3 scale) {
+            benchmark::timer t("Generate quad trees");
+            
+            _polyhedron = mesh::polyhedron<base_t>::normalized(poly);
+            _polyhedron = mesh::polyhedron<base_t>::scaled(_polyhedron, scale);
+            
+            glm::vec<3, base_t> dim = glm::ceil(_polyhedron.dim());
+            glm::vec<3, base_t> dim_half = dim / 2.f;
+            
+            // search trees always scaled to <max_tree_size> (save some memory)
+            constexpr int max_tree_size = 1024;
+            const glm::vec<3, base_t> scale_factors = glm::vec<3, base_t>(max_tree_size) / dim;
+            const float scale_factor = glm::compMin(scale_factors);
+            
+            if(scale_factor < 1) {
+                _tree_scale_factor = scale_factor;
+                _tree_scale_factors = scale_factors;
+            }
+            
+            _xy_tree = tree<quad::boundary, payload_t>(quad::boundary(dim_half.xy()*_tree_scale_factor, dim_half.xy()*_tree_scale_factor));
+            _yz_tree = tree<quad::boundary, payload_t>(quad::boundary(dim_half.yz()*_tree_scale_factor, dim_half.yz()*_tree_scale_factor));
+            _xz_tree = tree<quad::boundary, payload_t>(quad::boundary(dim_half.xz()*_tree_scale_factor, dim_half.xz()*_tree_scale_factor));
 
+            // build quad trees
+            for (const auto &f : _polyhedron._indices._buffer) {
+                const glm::vec<3, base_t> v1 = _polyhedron._vertices[f[0]] * _tree_scale_factor;
+                const glm::vec<3, base_t> v2 = _polyhedron._vertices[f[1]] * _tree_scale_factor;
+                const glm::vec<3, base_t> v3 = _polyhedron._vertices[f[2]] * _tree_scale_factor;
+                
+                glm::ivec3 min = glm::floor(glm::min(v1, glm::min(v2, v3)));
+                glm::ivec3 max = glm::ceil(glm::max(v1, glm::max(v2, v3)));
+                
+                for(int x = min.x; x < max.x; x++)
+                for(int y = min.y; y < max.y; y++) {
+                    int d = 0;
+                    const bool is_in = checks::raycast::pt_in_triangle(glm::vec2(x,y), v1.xyz(), v2.xyz(), v3.xyz(), d);
+                    if(is_in) {
+                        _xy_tree.insert(point((glm::vec2(x,y)), f));
+                    }
+                }
+                for(int y = min.y; y < max.y; y++)
+                for(int z = min.z; z < max.z; z++) {
+                    int d = 0;
+                    const bool is_in = checks::raycast::pt_in_triangle(glm::vec2(y,z), v1.yzx(), v2.yzx(), v3.yzx(), d);
+                    if(is_in) {
+                        _yz_tree.insert(point((glm::vec2(y,z)), f));
+                    }
+                }
+                for(int x = min.x; x < max.x; x++)
+                for(int z = min.z; z < max.z; z++) {
+                    int d = 0;
+                    const bool is_in = checks::raycast::pt_in_triangle(glm::vec2(x,z), v1.xzy(), v2.xzy(), v3.xzy(), d);
+                    if(is_in) {
+                        _xz_tree.insert(point((glm::vec2(x,z)), f));
+                    }
+                }
+            }
+            test_tree(_xy_tree);
+            test_tree(_yz_tree);
+            test_tree(_xz_tree);
+        }
+        
+        voxel_arr<base_t> rasterize() const {
+            // create timer object
+            benchmark::timer tmp("rasterize()");
+            const glm::vec3 dim = glm::ceil(_polyhedron.dim());
+            
+            // the quad tree is scaled up or down to 128 x Y x Z voxels
+            // thus, we calc the scale factors to access the tree
+            const glm::vec3 search_dist = (1.f / _tree_scale_factors); // slighty bigger than 1/2 which equals a whole step in case of some rounding noise
+            
+/*
+            intersections r;
+            r.yz = buffer3d<int>(dim.y, dim.z, 0);
+#pragma omp parallel for
+            for(int y = 0; y < dim.y; y++)
+            for(int z = 0; z < dim.z; z++) {
+                auto buffer = _yz_tree.find(glm::vec2(y*_tree_scale_factor, z*_tree_scale_factor), search_dist);
+                std::set<int> intersections = checks::raycast::get_intersections<yzx>(glm::ivec2(y,z), _polyhedron._vertices, buffer);
+                std::copy(intersections.begin(), intersections.end(), std::back_inserter(r.yz[y][z]));
+            }
+            r.xz = buffer3d<int>(dim.x, dim.z, 0);
+#pragma omp parallel for
+            for(int x = 0; x < dim.x; x++)
+            for(int z = 0; z < dim.z; z++) {
+                auto buffer = _xz_tree.find(glm::vec2(x*_tree_scale_factor, z*_tree_scale_factor), search_dist);
+                std::set<int> intersections = checks::raycast::get_intersections<xzy>(glm::ivec2(x,z), _polyhedron._vertices, buffer);
+                std::copy(intersections.begin(), intersections.end(), std::back_inserter(r.xz[x][z]));
+            }
+            r.xy = buffer3d<int>(dim.x, dim.y, 0);
+#pragma omp parallel for
+            for(int x = 0; x < dim.x; x++)
+            for(int y = 0; y < dim.y; y++) {
+                auto buffer = _xy_tree.find(glm::vec2(x*_tree_scale_factor, y*_tree_scale_factor), search_dist);
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>(glm::ivec2(x,y), _polyhedron._vertices, buffer);
+                std::copy(intersections.begin(), intersections.end(), std::back_inserter(r.xy[x][y]));
+            }
+            return r;
+*/
+/*
+            voxel_arr<base_t> res = { dim, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0), _polyhedron };
+            
+            for(int y = 0; y < dim.y; y++)
+            for(int z = 0; z < dim.z; z++) {
+                auto buffer = _yz_tree.find(glm::vec2(y*_tree_scale_factor, z*_tree_scale_factor), search_dist);
+                std::set<int> intersections = checks::raycast::get_intersections<yzx>(glm::vec2(y,z), _polyhedron._vertices, buffer);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, (int)dim.x-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[inters][y][z] = voxel_type::shell;                    
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.x ? inters : dim.x-1;
+                        if(res._voxels[i][y][z] == voxel_type::shell) continue;
+                        res._voxels[i][y][z] = is_in; // initially set voxel to 1
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+
+            for(int x = 0; x < dim.x; x++)
+            for(int z = 0; z < dim.z; z++) {
+                auto buffer = _xz_tree.find(glm::vec2(x*_tree_scale_factor, z*_tree_scale_factor), search_dist);
+                std::set<int> intersections = checks::raycast::get_intersections<xzy>(glm::vec2(x,z), _polyhedron._vertices, buffer);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, (int)dim.y-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[x][inters][z] = voxel_type::shell;
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.y ? inters : dim.y-1;
+                        if(res._voxels[x][i][z] == voxel_type::shell) continue;
+                        res._voxels[x][i][z] <<= is_in; // first bit shift; now the value should be either 0 or voxel_type::interior
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+
+            for(int x = 0; x < dim.x; x++)
+            for(int y = 0; y < dim.y; y++) {
+                auto buffer = _xy_tree.find(glm::vec2(x*_tree_scale_factor, y*_tree_scale_factor), search_dist);
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>(glm::vec2(x,y), _polyhedron._vertices, buffer);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, (int)dim.z-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[x][y][inters] = voxel_type::shell;
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.z ? inters : dim.z-1;
+                        if(res._voxels[x][y][i] == voxel_type::shell) continue;
+                        res._voxels[x][y][i] <<= is_in; // second bit shift; now the value should be either 0 or voxel_type::interior
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+            return res;
+*/
+return {};
+        }
+    };
+    
     //! generates a voxel mesh from an arbitrary polyhedron
     template<typename base_t>
-    class shell_only : public raster_base<base_t> {
+    class shell_only {
         mesh::polyhedron<base_t> _polyhedron;
         
     public:

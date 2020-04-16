@@ -26,6 +26,10 @@ public:
         : _buf(x, hidden::buf_1d<base_t>(y, val))
     {}
 
+    void clear() {
+        _buf.clear();
+    }
+    
     hidden::buf_1d<base_t> &operator[](size_t i) {
         return _buf[i];
     }
@@ -55,6 +59,10 @@ public:
               )
     {}
 
+    void clear() {
+        _buf.clear();
+    }
+    
     hidden::buf_2d<base_t> &operator[](size_t i) {
         return _buf[i];
     }

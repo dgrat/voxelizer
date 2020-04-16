@@ -17,9 +17,16 @@
 
 #include <tuple>
 
+template <typename base_t>
+struct compare_glm_vec2 {
+    bool operator() (const glm::vec<2, base_t>& lhs, const glm::vec<2, base_t>& rhs) const {
+        return std::make_tuple(lhs.x, lhs.y) < std::make_tuple(rhs.x, rhs.y);
+    }
+};
 
+template <typename base_t>
 struct compare_glm_vec3 {
-    bool operator() (const glm::vec3& lhs, const glm::vec3& rhs) const {
+    bool operator() (const glm::vec<3, base_t>& lhs, const glm::vec<3, base_t>& rhs) const {
         return std::make_tuple(lhs.x, lhs.y, lhs.z) < std::make_tuple(rhs.x, rhs.y, rhs.z);
     }
 };
