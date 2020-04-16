@@ -27,6 +27,16 @@ namespace rasterize {
         virtual voxel_arr<base_t> rasterize() const = 0;
     };
     
+    template<typename vec_t>
+    float area(const vec_t &v1, const vec_t &v2, const vec_t &v3) {
+        float le1 = glm::length(v2-v1);
+        float le2 = glm::length(v3-v1);
+        float le3 = glm::length(v3-v2);
+        float p = 0.5 * (le1 + le2 + le3);
+        float area = std::sqrt(p * (p - le1) * (p - le2) * (p - le3));
+        return area;
+    }
+    
     //! generates a voxel mesh from an arbitrary polyhedron
     template<typename base_t>
     class all_fast : public raster_base<base_t> {
@@ -34,17 +44,17 @@ namespace rasterize {
         
         mesh::polyhedron<base_t> _polyhedron;
         
-        buffer3d<id_t> _xy_plane_buffer;
-        buffer3d<id_t> _yz_plane_buffer;
-        buffer3d<id_t> _xz_plane_buffer;
+        buffer3d<mesh::face<id_t>> _xy_plane_buffer;
+        buffer3d<mesh::face<id_t>> _yz_plane_buffer;
+        buffer3d<mesh::face<id_t>> _xz_plane_buffer;
         
     private:
         mesh::polyhedron<base_t> prepare_index_buffers(
             const mesh::polyhedron<base_t> &in_mesh, 
             const glm::ivec3 &in_scale,
-            buffer3d<id_t> &out_xy, 
-            buffer3d<id_t> &out_yz,
-            buffer3d<id_t> &out_xz
+            buffer3d<mesh::face<id_t>> &out_xy, 
+            buffer3d<mesh::face<id_t>> &out_yz,
+            buffer3d<mesh::face<id_t>> &out_xz
         ) 
         {           
             benchmark::timer tmp("prepare_index_buffers()");
@@ -55,25 +65,22 @@ namespace rasterize {
             const glm::ivec3 dim = glm::ceil(mesh.dim());
 
             auto &indices = mesh._indices;
-            const size_t num_faces = indices._buffer.size() / indices._stride;
-            out_xy = buffer3d<id_t>(dim.x, dim.y, 0, 0);
-            out_yz = buffer3d<id_t>(dim.y, dim.z, 0, 0);
-            out_xz = buffer3d<id_t>(dim.x, dim.z, 0, 0);
+            out_xy = buffer3d<mesh::face<id_t>>(dim.x, dim.y, 0);
+            out_yz = buffer3d<mesh::face<id_t>>(dim.y, dim.z, 0);
+            out_xz = buffer3d<mesh::face<id_t>>(dim.x, dim.z, 0);
             
             // run over target voxel coordinates 
             // and check whether a faces cuts a posiion in one of the planes
             size_t num_elems = 0;
-            for(int i = 0; i < num_faces; i++) {
-                const id_t id1 = indices._buffer[i * indices._stride + 0];
-                const id_t id2 = indices._buffer[i * indices._stride + 1];
-                const id_t id3 = indices._buffer[i * indices._stride + 2];
-                
-                const auto &v1 = mesh._vertices[id1];
-                const auto &v2 = mesh._vertices[id2];
-                const auto &v3 = mesh._vertices[id3];
+            for(const mesh::face<id_t> &f : indices._buffer) {
+                const auto &v1 = mesh._vertices[f[0]];
+                const auto &v2 = mesh._vertices[f[1]];
+                const auto &v3 = mesh._vertices[f[2]];
 
-                // TODO
-                // remove faces which are too small
+                constexpr float area_bias = 0.1;
+                const float a_xz = area(v1.xz(), v2.xz(), v3.xz());
+                const float a_xy = area(v1.xy(), v2.xy(), v3.xy());
+                const float a_yz = area(v1.yz(), v2.yz(), v3.yz());
                 
                 // calc bbox around the face
                 // we use the bbox to create a simple search buffer (for later rasterization)
@@ -84,32 +91,32 @@ namespace rasterize {
                 // insert the face indices into the buffers
                 // do this for each major plane..
                 // xy
-                for(int x = min.x; x < max.x; x++)
-                for(int y = min.y; y < max.y; y++) {
-                    out_xy[x][y].push_back(id1);
-                    out_xy[x][y].push_back(id2);
-                    out_xy[x][y].push_back(id3);
-                    num_elems += 3;
+                if(a_xy > area_bias) {
+                    for(int x = min.x; x < max.x; x++)
+                    for(int y = min.y; y < max.y; y++) {
+                        out_xy[x][y].push_back(f);
+                        num_elems += 3;
+                    }
                 }
                 // yz
-                for(int y = min.y; y < max.y; y++)
-                for(int z = min.z; z < max.z; z++) {
-                    out_yz[y][z].push_back(id1);
-                    out_yz[y][z].push_back(id2);
-                    out_yz[y][z].push_back(id3);
-                    num_elems += 3;
+                if(a_yz > area_bias) {
+                    for(int y = min.y; y < max.y; y++)
+                    for(int z = min.z; z < max.z; z++) {
+                        out_yz[y][z].push_back(f);
+                        num_elems += 3;
+                    }
                 }
                 // xz
-                for(int x = min.x; x < max.x; x++)
-                for(int z = min.z; z < max.z; z++) {                 
-                    out_xz[x][z].push_back(id1);
-                    out_xz[x][z].push_back(id2);
-                    out_xz[x][z].push_back(id3);
-                    num_elems += 3;
+                if(a_xz > area_bias) {
+                    for(int x = min.x; x < max.x; x++)
+                    for(int z = min.z; z < max.z; z++) {                 
+                        out_xz[x][z].push_back(f);
+                        num_elems += 3;
+                    }
                 }
             }
             
-            float s_mb = (float)(num_elems * sizeof(id_t)) / (1024^2);
+            float s_mb = (float)((num_elems * sizeof(id_t)) / std::pow(1024, 2));
             std::cout << "search buffers are " << (size_t)s_mb << " MBytes" << std::endl;
             
             return mesh;

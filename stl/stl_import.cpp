@@ -131,13 +131,11 @@ namespace stl {
             vertex_arr.push_back(f._vert_2);
             vertex_arr.push_back(f._vert_3);
 
-            int id_v1 = i*3+0;
-            int id_v2 = i*3+1;
-            int id_v3 = i*3+2;
+            uint32_t id_v1 = i*3+0;
+            uint32_t id_v2 = i*3+1;
+            uint32_t id_v3 = i*3+2;
             
-            mesh._indices.add(id_v1);
-            mesh._indices.add(id_v2);
-            mesh._indices.add(id_v3);
+            mesh._indices.add(mesh::face(id_v1, id_v2, id_v3));
 
             mesh._edges[mesh::edge(id_v1, id_v2)] += 1;
             mesh._edges[mesh::edge(id_v2, id_v3)] += 1;

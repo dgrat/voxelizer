@@ -37,14 +37,64 @@ namespace mesh {
         arr_t _vertex_arr;
     };
 
+    template <typename index_t>
+    struct face {
+        std::array<index_t, 3> _ids;
+
+        operator const std::array<index_t, 3> &() const {
+            return _ids;
+        }
+        operator std::array<index_t, 3> &() {
+            return _ids;
+        }
+
+        index_t &operator [] (const size_t id) {
+            assert(id < 3);
+            return _ids[id];
+        }
+        const index_t &operator [] (const size_t id) const {
+            assert(id < 3);
+            return _ids[id];
+        }
+        
+        face() {
+            _ids = { 0 };
+        }
+        face(index_t v1, index_t v2, index_t v3) {
+            if(v1 > v2)
+                std::swap(v1, v2);
+            if(v2 > v3)
+                std::swap(v2, v3);
+            if(v1 > v2)
+                std::swap(v1, v2);
+            
+            _ids = { v1, v2, v3 };
+        }
+    };
+    
     //! axis aligned index buffer for faster voxelization
     template<typename index_t>
     struct index_buffer {
-        std::vector<index_t> _buffer;    // face indices
-        int _stride = 3;                // stride of std::vector
+        std::vector<face<index_t>> _buffer;    // face indices
+
+        operator const std::vector<face<index_t>> &() const {
+            return _buffer;
+        }
+        operator std::vector<face<index_t>> &() {
+            return _buffer;
+        }
+
+        face<index_t> &operator [] (const size_t id) {
+            assert(id < _buffer.size());
+            return _buffer[id];
+        }
+        const face<index_t> &operator [] (const size_t id) const {
+            assert(id < _buffer.size());
+            return _buffer[id];
+        }
         
-        void add(const index_t index) {
-            _buffer.push_back(index);
+        void add(const face<index_t> &f) {
+            _buffer.push_back(f);
         }
     };
     

@@ -68,7 +68,7 @@ namespace voxelize {
                 p = std::filesystem::path(_project_cfg.target_dir()) / (std::to_string(_proj_file_cntr++) + ext);
             }
             else {
-                p = std::filesystem::path(_project_cfg.target_dir()) / d.cfg._file_out;
+                p = std::filesystem::path(_project_cfg.target_dir()) / (d.cfg._file_out + ext);
             }
             return p;
         }
@@ -91,16 +91,22 @@ namespace voxelize {
             }
         }
         
+        void to_fs_obj() {
+            for(const voxel_data_t &mdata : _rasterizer_res) {
+                const std::filesystem::path p = make_fname(mdata, ".obj");
+                mdata.mesh.to_obj(p.string());
+            }
+        }
+        
         template<typename rule_t>
         void to_fs_stl() {
             const glm::vec3 proj_dim = (_prj_bbox._max - _prj_bbox._min);
             const float scalef = _max_grid_size / glm::compMax(proj_dim);  
             
-            int file_id = 0;
             for(const voxel_data_t &mdata : _rasterizer_res) {
                 const rasterize::voxel_arr<float> &arr = mdata.voxels;
                 
-                std::filesystem::path p = make_fname(mdata, ".stl");
+                const std::filesystem::path p = make_fname(mdata, ".stl");
                 benchmark::timer t("voxelizer::to_stl() - " + p.string() + " export took");
                                 
                 auto stlf = stl::format::open(p.string());

@@ -19,7 +19,10 @@ private:
 
 public:
     buffer2d() = default;
-    buffer2d(size_t x, size_t y, int8_t val = 0) 
+    buffer2d(size_t x, size_t y) 
+        : _buf(x, hidden::buf_1d<base_t>(y))
+    {}
+    buffer2d(size_t x, size_t y, base_t val) 
         : _buf(x, hidden::buf_1d<base_t>(y, val))
     {}
 
@@ -39,7 +42,13 @@ private:
 
 public:
     buffer3d() = default;
-    buffer3d(size_t x, size_t y, size_t z, int8_t val = 0) 
+    buffer3d(size_t x, size_t y, size_t z) 
+        : _buf(x, 
+               hidden::buf_2d<base_t>(y, 
+               hidden::buf_1d<base_t>(z))
+              )
+    {}
+    buffer3d(size_t x, size_t y, size_t z, base_t val) 
         : _buf(x, 
                hidden::buf_2d<base_t>(y, 
                hidden::buf_1d<base_t>(z, val))

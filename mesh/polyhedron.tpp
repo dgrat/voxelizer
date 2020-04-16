@@ -76,17 +76,8 @@ namespace mesh {
             obj_file << "v " << v.x << " " << v.y << " " << v.z << std::endl;
         }
 
-        const size_t faces = this->_indices._buffer.size() / this->_indices._stride;
-        for(size_t i = 0; i < faces; i++) {
-            index_t id1 = i * this->_indices._stride + 0;
-            index_t id2 = i * this->_indices._stride + 1;
-            index_t id3 = i * this->_indices._stride + 2;
-
-            index_t vid1 = this->_indices._buffer.at(id1) + 1;
-            index_t vid2 = this->_indices._buffer.at(id2) + 1;
-            index_t vid3 = this->_indices._buffer.at(id3) + 1;
-
-            obj_file << "f " << vid1 << " " << vid2 << " " << vid3 << std::endl;
+        for(auto &f : _indices._buffer) {
+            obj_file << "f " << f[0]+1 << " " << f[1]+1 << " " << f[2]+1 << std::endl;
         }
         obj_file.close();
     }
