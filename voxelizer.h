@@ -282,8 +282,8 @@ namespace voxelize {
                 
                 std::cout << "Process file: " << mdata.cfg._file_in << std::endl;
                 
-                //mdata.voxels = rasterize::all_fast(mdata.mesh, glm::ivec3(dim)).rasterize();
-                mdata.intersections = rasterize::all_oct(mdata.mesh, glm::ivec3(dim)).rasterize();
+                mdata.voxels = rasterize::all_fast(mdata.mesh, glm::ivec3(dim)).rasterize();
+                //mdata.voxels = rasterize::all_oct(mdata.mesh, glm::ivec3(dim)).rasterize();
                 //mdata.voxels = rasterize::shell_only(mdata.mesh, _max_grid_size).rasterize();
             }
         }

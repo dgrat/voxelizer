@@ -8,10 +8,10 @@
 
 int main()
 {
-    cfg::xml_project pro(".");
+    cfg::xml_project pro("./shapes");
     voxelize::voxelizer v(pro);
     v.run();
-    v.to_fs_obj();
+    //v.to_fs_obj();
     v.to_fs_stl<build_stl_cube>();
     //v.to_fs_bytes();
     

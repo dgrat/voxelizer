@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 project(VoxelMagick LANGUAGES CXX)
 
+find_package( OpenCV REQUIRED )
 find_package(OpenMP)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -59,7 +60,7 @@ link_directories(pugixml)
 
 add_executable(VoxelMagick main.cpp ${voxel_lib})
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(VoxelMagick pugixml OpenMP::OpenMP_CXX)
+    target_link_libraries(VoxelMagick pugixml OpenMP::OpenMP_CXX ${OpenCV_LIBS})
 else()
-    target_link_libraries(VoxelMagick pugixml)
+    target_link_libraries(VoxelMagick pugixml ${OpenCV_LIBS})
 endif()

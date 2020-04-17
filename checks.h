@@ -153,19 +153,16 @@ namespace checks {
             return is_in;
         }        
         
-        template<swizzle_mode mode, typename base_t, typename index_t>
+        template<swizzle_mode mode, typename base_t, typename vert_buf_t, typename face_buf_t>
         std::set<int> get_intersections(const glm::vec<2, base_t> &pos, 
-                                        const std::vector<glm::vec<3, base_t>> &vert_buffer, 
-                                        const buffer3d<mesh::face<index_t>> &face_indices) 
+                                        const vert_buf_t &vert_buffer, 
+                                        const face_buf_t &face_indices) 
         {
-            const auto &vertex_arr =  vert_buffer;
-            const auto &index_buf = face_indices[pos.x][pos.y];
-
             std::set<int> inters_dist;
-            for(auto &f : index_buf) {
-                const glm::vec<3, base_t> &v1 = hidden::swizzle_vector(vertex_arr.at(f[0]), mode);
-                const glm::vec<3, base_t> &v2 = hidden::swizzle_vector(vertex_arr.at(f[1]), mode);
-                const glm::vec<3, base_t> &v3 = hidden::swizzle_vector(vertex_arr.at(f[2]), mode);
+            for(auto &f : face_indices) {
+                const glm::vec<3, base_t> &v1 = hidden::swizzle_vector(vert_buffer[f[0]], mode);
+                const glm::vec<3, base_t> &v2 = hidden::swizzle_vector(vert_buffer[f[1]], mode);
+                const glm::vec<3, base_t> &v3 = hidden::swizzle_vector(vert_buffer[f[2]], mode);
 
                 int d = 0;
                 if(pt_in_triangle(pos, v1, v2, v3, d)) {

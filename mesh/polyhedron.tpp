@@ -10,7 +10,6 @@ namespace mesh {
         for(size_t i = 0; i < _vertices.size(); i++) {
             _vertices[i] *= dim;
         }
-        _dim = cur_size * dim;
     }
 
     template<typename base_t>
@@ -22,7 +21,6 @@ namespace mesh {
         for(size_t i = 0; i < _vertices.size(); i++) {
             _vertices[i] *= dim;
         }
-        _dim = cur_size * dim;
     }
     
     template<typename base_t>
@@ -43,9 +41,6 @@ namespace mesh {
         for(size_t i = 0; i < _vertices.size(); i++) {
             _vertices[i] = calc_pos(_vertices[i]);
         }
-        
-        // return new dimensions of the model
-        _dim = cur_size / comp_max;
     }
 
     template<typename base_t>
@@ -80,17 +75,22 @@ namespace mesh {
             obj_file << "f " << f[0]+1 << " " << f[1]+1 << " " << f[2]+1 << std::endl;
         }
         obj_file.close();
-    }
-
+    }    
+    
     template<typename base_t>
-    stl::bbox<base_t> polyhedron<base_t>::bounding_box() {
+    stl::bbox<base_t> polyhedron<base_t>::bounding_box() const {
         stl::bbox<base_t> bbox;
         for(const auto &v : this->_vertices) {
             bbox.extend(v);
         }
-        _dim = bbox._max - bbox._min;
         return bbox;
-    }  
+    }
+    
+    template<typename base_t>
+    glm::vec<3, base_t> polyhedron<base_t>::dim() const {
+        auto tmp = bounding_box();
+        return tmp._max - tmp._min; 
+    }
     
     template<typename base_t>
     bool polyhedron<base_t>::issues() const {

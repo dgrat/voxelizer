@@ -8,6 +8,7 @@
 #include "buffer.h"
 #include "timer.h"
 #include "enums.h"
+#include "octree/tree.h"
 
 #include <set>
 #include <vector>
@@ -129,7 +130,7 @@ namespace rasterize {
 #pragma omp parallel for
             for(int y = 0; y < dim.y; y++)
             for(int z = 0; z < dim.z; z++) {
-                std::set<int> intersections = checks::raycast::get_intersections<yzx>({y,z}, _polyhedron._vertices, _yz_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<yzx>(glm::ivec2(y,z), _polyhedron._vertices, _yz_plane_buffer[y][z]);
                 bool is_in = intersections.size() % 2 == 0 ? false : true;
                 
                 int from = 0;
@@ -149,7 +150,7 @@ namespace rasterize {
 #pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int z = 0; z < dim.z; z++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xzy>({x,z}, _polyhedron._vertices, _xz_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<xzy>(glm::ivec2(x,z), _polyhedron._vertices, _xz_plane_buffer[x][z]);
                 bool is_in = intersections.size() % 2 == 0 ? false : true;
                 
                 int from = 0;
@@ -169,7 +170,7 @@ namespace rasterize {
 #pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int y = 0; y < dim.y; y++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xyz>({x,y}, _polyhedron._vertices, _xy_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>(glm::ivec2(x,y), _polyhedron._vertices, _xy_plane_buffer[x][y]);
                 bool is_in = intersections.size() % 2 == 0 ? false : true;
                 
                 int from = 0;
@@ -208,45 +209,148 @@ namespace rasterize {
     template<typename base_t>
     class all_oct {
         using id_t = typename mesh::polyhedron<base_t>::index_t;
+        using payload_t = point<glm::vec<2, base_t>, mesh::face<id_t>>;
         
         mesh::polyhedron<base_t> _polyhedron;
-        buffer3d<mesh::face<id_t>> _xy_plane_buffer;
-        buffer3d<mesh::face<id_t>> _yz_plane_buffer;
-        buffer3d<mesh::face<id_t>> _xz_plane_buffer;
+        tree<quad::boundary, payload_t> _xy_tree;
+        tree<quad::boundary, payload_t> _yz_tree;
+        tree<quad::boundary, payload_t> _xz_tree;
         
     public: 
-        all_oct(const mesh::polyhedron<base_t> &poly, glm::ivec3 dim) {
-            _polyhedron = prepare_index_buffers(poly, dim, _xy_plane_buffer, _yz_plane_buffer, _xz_plane_buffer);
+        all_oct(const mesh::polyhedron<base_t> &poly, glm::ivec3 scale) {
+            benchmark::timer t("Generate quad trees");
+            
+            _polyhedron = mesh::polyhedron<base_t>::normalized(poly);
+            _polyhedron = mesh::polyhedron<base_t>::scaled(_polyhedron, scale);
+            
+            glm::vec3 dim = glm::ceil(_polyhedron.dim());
+            glm::vec3 dim_half = dim / 2.f;
+            
+            printf("dim: %f %f %f\n", dim.x, dim.y, dim.z);
+            printf("dim_half: %f %f %f\n", dim_half.x, dim_half.y, dim_half.z);
+            
+            _xy_tree = tree<quad::boundary, payload_t>(quad::boundary(dim_half.xy(), dim_half.xy()));
+            _yz_tree = tree<quad::boundary, payload_t>(quad::boundary(dim_half.yz(), dim_half.yz()));
+            _xz_tree = tree<quad::boundary, payload_t>(quad::boundary(dim_half.xz(), dim_half.xz()));
+            
+            // build tree
+            int i = 0;
+            for (const auto &f : _polyhedron._indices._buffer) {
+                const glm::vec<3, base_t> &v1 = _polyhedron._vertices[f[0]];
+                const glm::vec<3, base_t> &v2 = _polyhedron._vertices[f[1]];
+                const glm::vec<3, base_t> &v3 = _polyhedron._vertices[f[2]];
+                
+                _xy_tree.insert(point((v1.xy()), f));
+                _xy_tree.insert(point((v2.xy()), f));
+                _xy_tree.insert(point((v3.xy()), f));
+
+                _yz_tree.insert(point((v1.yz()), f));
+                _yz_tree.insert(point((v2.yz()), f));
+                _yz_tree.insert(point((v3.yz()), f));   
+                
+                _xz_tree.insert(point((v1.xz()), f));
+                _xz_tree.insert(point((v2.xz()), f));
+                _xz_tree.insert(point((v3.xz()), f));
+            }
+            //test_tree(_xy_tree);
+            //test_tree(_yz_tree);
+            //test_tree(_xz_tree);
         }
         
-        intersections rasterize() const {
+        voxel_arr<base_t> rasterize() const {
             // create timer object
             benchmark::timer tmp("rasterize()");
-            
             const glm::ivec3 dim = glm::ceil(_polyhedron.dim());
+            
+/*
             intersections r;
             r.yz = buffer3d<int>(dim.y, dim.z, 0);
 #pragma omp parallel for
             for(int y = 0; y < dim.y; y++)
             for(int z = 0; z < dim.z; z++) {
-                std::set<int> intersections = checks::raycast::get_intersections<yzx>({y,z}, _polyhedron._vertices, _yz_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<yzx>(glm::ivec2(y,z), _polyhedron._vertices, _yz_tree[glm::vec2(y,z)]);
                 std::copy(intersections.begin(), intersections.end(), std::back_inserter(r.yz[y][z]));
             }
             r.xz = buffer3d<int>(dim.x, dim.z, 0);
 #pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int z = 0; z < dim.z; z++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xzy>({x,z}, _polyhedron._vertices, _xz_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<xzy>(glm::ivec2(x,z), _polyhedron._vertices, _xz_tree[glm::vec2(x,z)]);
                 std::copy(intersections.begin(), intersections.end(), std::back_inserter(r.xz[x][z]));
             }
             r.xy = buffer3d<int>(dim.x, dim.y, 0);
 #pragma omp parallel for
             for(int x = 0; x < dim.x; x++)
             for(int y = 0; y < dim.y; y++) {
-                std::set<int> intersections = checks::raycast::get_intersections<xyz>({x,y}, _polyhedron._vertices, _xy_plane_buffer);
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>(glm::ivec2(x,y), _polyhedron._vertices, _xy_tree[glm::vec2(x,y)]);
                 std::copy(intersections.begin(), intersections.end(), std::back_inserter(r.xy[x][y]));
             }
             return r;
+*/
+
+            voxel_arr<base_t> res = { dim, buffer3d<int8_t>(dim.x, dim.y, dim.z, 0), _polyhedron };
+
+#pragma omp parallel for
+            for(int y = 0; y < dim.y; y++)
+            for(int z = 0; z < dim.z; z++) {
+                std::set<int> intersections = checks::raycast::get_intersections<yzx>(glm::ivec2(y,z), _polyhedron._vertices, _yz_tree[glm::vec2(y,z)]);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, dim.x-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[inters][y][z] = voxel_type::shell;                    
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.x ? inters : dim.x-1;
+                        if(res._voxels[i][y][z] == voxel_type::shell) continue;
+                        res._voxels[i][y][z] = is_in; // initially set voxel to 1
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+#pragma omp parallel for
+            for(int x = 0; x < dim.x; x++)
+            for(int z = 0; z < dim.z; z++) {
+                std::set<int> intersections = checks::raycast::get_intersections<xzy>(glm::ivec2(x,z), _polyhedron._vertices, _xz_tree[glm::vec2(x,z)]);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, dim.y-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[x][inters][z] = voxel_type::shell;
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.y ? inters : dim.y-1;
+                        if(res._voxels[x][i][z] == voxel_type::shell) continue;
+                        res._voxels[x][i][z] <<= is_in; // first bit shift; now the value should be either 0 or voxel_type::interior
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+#pragma omp parallel for
+            for(int x = 0; x < dim.x; x++)
+            for(int y = 0; y < dim.y; y++) {
+                std::set<int> intersections = checks::raycast::get_intersections<xyz>(glm::ivec2(x,y), _polyhedron._vertices, _xy_tree[glm::vec2(x,y)]);
+                bool is_in = intersections.size() % 2 == 0 ? false : true;
+                
+                int from = 0;
+                for(int inters : intersections) {
+                    inters = constrain(0, dim.z-1, inters); // ensure we do not exceed array boundaries
+                    
+                    res._voxels[x][y][inters] = voxel_type::shell;
+                    for(int i = from; i < inters; i++) {
+                        inters = inters < dim.z ? inters : dim.z-1;
+                        if(res._voxels[x][y][i] == voxel_type::shell) continue;
+                        res._voxels[x][y][i] <<= is_in; // second bit shift; now the value should be either 0 or voxel_type::interior
+                    }
+                    from = inters+1;
+                    is_in = !is_in;
+                }
+            }
+            return res;
         }
     };
     
